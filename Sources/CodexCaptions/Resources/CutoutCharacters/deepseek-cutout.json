@@ -1,0 +1,1179 @@
+{
+  "id": "deepseek-cutout",
+  "displayName": "DeepSeek 鲸鱼娘 · Cutout",
+  "resourceDirectory": "DeepSeekCutout",
+  "cutout": {
+    "schemaVersion": 1,
+    "canvas": [
+      1024,
+      1024
+    ],
+    "anchor": [
+      512,
+      12.349794238683128
+    ],
+    "pointsPerPixel": 0.16698298429319372,
+    "bones": [
+      {
+        "id": "root",
+        "parent": null,
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "torso",
+        "parent": "root",
+        "position": [
+          486,
+          477
+        ]
+      },
+      {
+        "id": "head",
+        "parent": "torso",
+        "position": [
+          0,
+          37
+        ]
+      },
+      {
+        "id": "hair-back",
+        "parent": "head",
+        "position": [
+          3,
+          353
+        ]
+      },
+      {
+        "id": "hair-front",
+        "parent": "head",
+        "position": [
+          3,
+          353
+        ]
+      },
+      {
+        "id": "ahoge",
+        "parent": "head",
+        "position": [
+          -5,
+          411
+        ]
+      },
+      {
+        "id": "tail",
+        "parent": "root",
+        "position": [
+          700,
+          264
+        ]
+      },
+      {
+        "id": "arm-right",
+        "parent": "torso",
+        "position": [
+          -111,
+          0
+        ]
+      },
+      {
+        "id": "right-elbow",
+        "parent": "arm-right",
+        "position": [
+          1,
+          -96
+        ]
+      },
+      {
+        "id": "right-wrist",
+        "parent": "right-elbow",
+        "position": [
+          74,
+          73
+        ]
+      },
+      {
+        "id": "arm-left",
+        "parent": "torso",
+        "position": [
+          87,
+          -1
+        ]
+      },
+      {
+        "id": "gaze",
+        "parent": "head",
+        "position": [
+          -2,
+          105
+        ]
+      }
+    ],
+    "slots": [
+      {
+        "id": "back hair",
+        "bone": "hair-back",
+        "order": 0,
+        "category": "hair",
+        "optional": true
+      },
+      {
+        "id": "tail",
+        "bone": "tail",
+        "order": 1,
+        "category": "tail",
+        "optional": true
+      },
+      {
+        "id": "neck",
+        "bone": "torso",
+        "order": 2,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "legwear",
+        "bone": "root",
+        "order": 3,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "footwear",
+        "bone": "root",
+        "order": 4,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "topwear",
+        "bone": "root",
+        "order": 5,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "face",
+        "bone": "head",
+        "order": 6,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "nose",
+        "bone": "head",
+        "order": 7,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "mouth",
+        "bone": "head",
+        "order": 8,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "eyewhite-r",
+        "bone": "head",
+        "order": 9,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "eyewhite-l",
+        "bone": "head",
+        "order": 10,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "irides-l",
+        "bone": "gaze",
+        "order": 11,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "irides-r",
+        "bone": "gaze",
+        "order": 12,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "eyelash-l",
+        "bone": "head",
+        "order": 13,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "eyelash-r",
+        "bone": "head",
+        "order": 14,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "eyebrow-l",
+        "bone": "head",
+        "order": 15,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "eyebrow-r",
+        "bone": "head",
+        "order": 16,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "right-upper",
+        "bone": "arm-right",
+        "order": 17,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "right-fore",
+        "bone": "right-elbow",
+        "order": 18,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "right-hand",
+        "bone": "right-wrist",
+        "order": 19,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "handwear-l",
+        "bone": "arm-left",
+        "order": 20,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "whale-fin-r",
+        "bone": "head",
+        "order": 23,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "whale-fin-l",
+        "bone": "head",
+        "order": 24,
+        "category": "identity",
+        "optional": false
+      },
+      {
+        "id": "front hair",
+        "bone": "hair-front",
+        "order": 25,
+        "category": "hair",
+        "optional": true
+      },
+      {
+        "id": "headwear",
+        "bone": "head",
+        "order": 26,
+        "category": "headwear",
+        "optional": true
+      },
+      {
+        "id": "bow-r",
+        "bone": "head",
+        "order": 27,
+        "category": "headwear",
+        "optional": true
+      },
+      {
+        "id": "bow-l",
+        "bone": "head",
+        "order": 28,
+        "category": "headwear",
+        "optional": true
+      },
+      {
+        "id": "ahoge",
+        "bone": "ahoge",
+        "order": 29,
+        "category": "hair",
+        "optional": true
+      },
+      {
+        "id": "shoulder-ruffle-r",
+        "bone": "torso",
+        "order": 21,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "shoulder-ruffle-l",
+        "bone": "torso",
+        "order": 22,
+        "category": "clothes",
+        "optional": false
+      },
+      {
+        "id": "rear scalp",
+        "bone": "head",
+        "order": -1,
+        "category": "hair",
+        "optional": true
+      },
+      {
+        "id": "ponytail left",
+        "bone": "hair-back",
+        "order": 0,
+        "category": "hair",
+        "optional": true
+      },
+      {
+        "id": "ponytail right",
+        "bone": "hair-back",
+        "order": 0,
+        "category": "hair",
+        "optional": true
+      },
+      {
+        "id": "side lock left",
+        "bone": "hair-front",
+        "order": 25,
+        "category": "hair",
+        "optional": true
+      },
+      {
+        "id": "side lock right",
+        "bone": "hair-front",
+        "order": 25,
+        "category": "hair",
+        "optional": true
+      }
+    ],
+    "variants": [
+      {
+        "id": "identity-original",
+        "title": "DeepSeek 身份部件",
+        "category": "identity",
+        "attachments": [
+          {
+            "slot": "neck",
+            "file": "parts/neck.png",
+            "rect": [
+              445,
+              488,
+              65,
+              91
+            ]
+          },
+          {
+            "slot": "face",
+            "file": "parts/face.png",
+            "rect": [
+              328,
+              511,
+              315,
+              321
+            ]
+          },
+          {
+            "slot": "nose",
+            "file": "parts/nose.png",
+            "rect": [
+              464,
+              584,
+              7,
+              7
+            ]
+          },
+          {
+            "slot": "mouth",
+            "file": "expressions/mouth/frame-00.png",
+            "rect": [
+              450,
+              538,
+              49,
+              36
+            ]
+          },
+          {
+            "slot": "eyewhite-r",
+            "file": "parts/eyewhite-r.png",
+            "rect": [
+              361,
+              591,
+              77,
+              68
+            ]
+          },
+          {
+            "slot": "eyewhite-l",
+            "file": "parts/eyewhite-l.png",
+            "rect": [
+              519,
+              579,
+              84,
+              67
+            ]
+          },
+          {
+            "slot": "irides-l",
+            "file": "parts/irides-l.png",
+            "rect": [
+              522,
+              580,
+              58,
+              63
+            ]
+          },
+          {
+            "slot": "irides-r",
+            "file": "parts/irides-r.png",
+            "rect": [
+              381,
+              592,
+              54,
+              62
+            ]
+          },
+          {
+            "slot": "eyelash-l",
+            "file": "parts/eyelash-l.png",
+            "rect": [
+              519,
+              591,
+              99,
+              72
+            ]
+          },
+          {
+            "slot": "eyelash-r",
+            "file": "parts/eyelash-r.png",
+            "rect": [
+              345,
+              609,
+              95,
+              66
+            ]
+          },
+          {
+            "slot": "eyebrow-l",
+            "file": "parts/eyebrow-l.png",
+            "rect": [
+              531,
+              686,
+              70,
+              27
+            ]
+          },
+          {
+            "slot": "eyebrow-r",
+            "file": "parts/eyebrow-r.png",
+            "rect": [
+              372,
+              703,
+              56,
+              19
+            ]
+          },
+          {
+            "slot": "whale-fin-r",
+            "file": "parts/whale-fin-r.png",
+            "rect": [
+              162,
+              604,
+              126,
+              111
+            ]
+          },
+          {
+            "slot": "whale-fin-l",
+            "file": "parts/whale-fin-l.png",
+            "rect": [
+              690,
+              575,
+              132,
+              109
+            ]
+          }
+        ]
+      },
+      {
+        "id": "clothes-original",
+        "title": "女仆装 · PSD 坐姿",
+        "category": "clothes",
+        "attachments": [
+          {
+            "slot": "legwear",
+            "file": "parts/legwear.png",
+            "rect": [
+              347,
+              48,
+              236,
+              222
+            ]
+          },
+          {
+            "slot": "footwear",
+            "file": "parts/footwear.png",
+            "rect": [
+              365,
+              32,
+              211,
+              121
+            ]
+          },
+          {
+            "slot": "topwear",
+            "file": "parts/topwear-body.png",
+            "rect": [
+              203,
+              113,
+              548,
+              408
+            ]
+          },
+          {
+            "slot": "handwear-l",
+            "file": "parts/handwear-l.png",
+            "rect": [
+              388,
+              280,
+              218,
+              214
+            ]
+          },
+          {
+            "slot": "right-upper",
+            "file": "parts/right-upper.png",
+            "rect": [
+              329,
+              377,
+              84,
+              118
+            ]
+          },
+          {
+            "slot": "right-fore",
+            "file": "parts/right-fore.png",
+            "rect": [
+              349,
+              336,
+              127,
+              147
+            ]
+          },
+          {
+            "slot": "right-hand",
+            "file": "parts/right-hand.png",
+            "rect": [
+              418,
+              444,
+              69,
+              91
+            ]
+          },
+          {
+            "slot": "shoulder-ruffle-r",
+            "file": "parts/shoulder-ruffle-r.png",
+            "rect": [
+              357,
+              411,
+              59,
+              110
+            ]
+          },
+          {
+            "slot": "shoulder-ruffle-l",
+            "file": "parts/shoulder-ruffle-l.png",
+            "rect": [
+              517,
+              404,
+              67,
+              115
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hair-original",
+        "title": "原图长发 · 前发/后发/呆毛",
+        "category": "hair",
+        "attachments": [
+          {
+            "slot": "back hair",
+            "file": "parts/back-hair.png",
+            "rect": [
+              149,
+              220,
+              686,
+              705
+            ]
+          },
+          {
+            "slot": "front hair",
+            "file": "parts/front-hair.png",
+            "rect": [
+              255,
+              413,
+              444,
+              469
+            ]
+          },
+          {
+            "slot": "ahoge",
+            "file": "parts/ahoge.png",
+            "rect": [
+              367,
+              897,
+              154,
+              90
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hair-none",
+        "title": "无头发 · 底层审查",
+        "category": "hair",
+        "attachments": []
+      },
+      {
+        "id": "headwear-original",
+        "title": "完整白头带和蓝蝴蝶结",
+        "category": "headwear",
+        "attachments": [
+          {
+            "slot": "headwear",
+            "file": "parts/headwear.png",
+            "rect": [
+              272,
+              725,
+              455,
+              210
+            ]
+          },
+          {
+            "slot": "bow-r",
+            "file": "parts/bow-r.png",
+            "rect": [
+              255,
+              715,
+              40,
+              60
+            ]
+          },
+          {
+            "slot": "bow-l",
+            "file": "parts/bow-l.png",
+            "rect": [
+              677,
+              672,
+              74,
+              71
+            ]
+          }
+        ]
+      },
+      {
+        "id": "headwear-none",
+        "title": "无头饰",
+        "category": "headwear",
+        "attachments": []
+      },
+      {
+        "id": "tail-original",
+        "title": "鲸尾",
+        "category": "tail",
+        "attachments": [
+          {
+            "slot": "tail",
+            "file": "parts/tail.png",
+            "rect": [
+              649,
+              102,
+              235,
+              267
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tail-none",
+        "title": "无尾巴",
+        "category": "tail",
+        "attachments": []
+      },
+      {
+        "id": "hair-style-high-twin-no-side-locks",
+        "title": "高位双马尾",
+        "category": "hair",
+        "attachments": [
+          {
+            "slot": "back hair",
+            "file": "hairstyles/shared/high-twin-rear-gathered.png",
+            "rect": [
+              57.97767145135566,
+              169.03349282296654,
+              912.1275917065391,
+              758.609250398724
+            ]
+          },
+          {
+            "slot": "ahoge",
+            "file": "parts/ahoge.png",
+            "rect": [
+              367,
+              897,
+              154,
+              90
+            ]
+          },
+          {
+            "slot": "front hair",
+            "file": "hairstyles/shared/front-hair-split.png",
+            "rect": [
+              255,
+              535,
+              444,
+              347
+            ]
+          }
+        ]
+      },
+      {
+        "id": "hair-style-low-twin-tied-v6-no-side-locks",
+        "title": "低位双马尾",
+        "category": "hair",
+        "attachments": [
+          {
+            "slot": "ahoge",
+            "file": "parts/ahoge.png",
+            "rect": [
+              367,
+              897,
+              154,
+              90
+            ]
+          },
+          {
+            "slot": "rear scalp",
+            "file": "hairstyles/shared/low-twin-tied-v6-rear-gathered.png",
+            "rect": [
+              248.0,
+              495.0,
+              488.0,
+              430.0
+            ]
+          },
+          {
+            "slot": "ponytail left",
+            "file": "hairstyles/low-twin-tied-v6/ponytail-left.png",
+            "rect": [
+              126.2982456140351,
+              235.53110047846894,
+              204.96331738437001,
+              398.49441786283893
+            ],
+            "rotation": 8,
+            "pivot": [
+              296,
+              602
+            ]
+          },
+          {
+            "slot": "ponytail right",
+            "file": "hairstyles/low-twin-tied-v6/ponytail-right.png",
+            "rect": [
+              640.7384370015949,
+              235.53110047846894,
+              212.31259968102074,
+              396.8612440191388
+            ],
+            "rotation": -8,
+            "pivot": [
+              686,
+              602
+            ]
+          },
+          {
+            "slot": "front hair",
+            "file": "hairstyles/shared/front-hair-split.png",
+            "rect": [
+              255,
+              535,
+              444,
+              347
+            ]
+          }
+        ]
+      }
+    ],
+    "defaults": {
+      "identity": "identity-original",
+      "clothes": "clothes-original",
+      "hair": "hair-original",
+      "headwear": "headwear-original",
+      "tail": "tail-original"
+    },
+    "motions": "classic-thinking-motions.json",
+    "_scope": "User approved original, high and low twin hairstyles; seated cutout",
+    "_source": {
+      "psd": "seethrough-repaired.psd",
+      "sha256": "d9bff1cee102b7d2f43e82466681efc13fc0ab5c45e0d420a89bf09e01e4d4a5",
+      "coordinates": "Original 1024x1024; top-origin export converted to y-up; no component fit",
+      "ownershipSHA256": "c3f95f777447e937ec9cb226e8e00f5b179f3b61e07b4b6393b9ce1576e6b3e4",
+      "facePreparation": "scripts/prepare_seethrough_face.py + scripts/prepare_seethrough_face.swift",
+      "thinkingPreparation": "scripts/prepare_seethrough_thinking.py",
+      "bodyThinkingPreparation": "scripts/prepare_seethrough_body_thinking.py",
+      "hairThinkingPreparation": "scripts/prepare_seethrough_hair_thinking.py",
+      "classicThinkingPreparation": "scripts/prepare_seethrough_classic_thinking.py"
+    },
+    "_pending": [
+      "Additional hairstyles and Claude workwear",
+      "Window and standing action migration"
+    ],
+    "twoBoneConstraints": [
+      {
+        "id": "right-chin-contact",
+        "upper": "arm-right",
+        "middle": "right-elbow",
+        "end": "right-wrist",
+        "targetBone": "head",
+        "targetPoint": [
+          450,
+          454
+        ],
+        "bend": 1,
+        "matchTargetRotation": true
+      }
+    ],
+    "expressions": {
+      "eyewhite-r": [
+        "expressions/eyewhite-r/frame-00.png",
+        "expressions/eyewhite-r/frame-01.png",
+        "expressions/eyewhite-r/frame-02.png",
+        "expressions/eyewhite-r/frame-03.png",
+        "expressions/eyewhite-r/frame-04.png",
+        "expressions/eyewhite-r/frame-05.png",
+        "expressions/eyewhite-r/frame-06.png",
+        "expressions/eyewhite-r/frame-07.png",
+        "expressions/eyewhite-r/frame-08.png",
+        "expressions/eyewhite-r/frame-09.png",
+        "expressions/eyewhite-r/frame-10.png",
+        "expressions/eyewhite-r/frame-11.png",
+        "expressions/eyewhite-r/frame-12.png",
+        "expressions/eyewhite-r/frame-13.png",
+        "expressions/eyewhite-r/frame-14.png",
+        "expressions/eyewhite-r/frame-15.png"
+      ],
+      "eyewhite-l": [
+        "expressions/eyewhite-l/frame-00.png",
+        "expressions/eyewhite-l/frame-01.png",
+        "expressions/eyewhite-l/frame-02.png",
+        "expressions/eyewhite-l/frame-03.png",
+        "expressions/eyewhite-l/frame-04.png",
+        "expressions/eyewhite-l/frame-05.png",
+        "expressions/eyewhite-l/frame-06.png",
+        "expressions/eyewhite-l/frame-07.png",
+        "expressions/eyewhite-l/frame-08.png",
+        "expressions/eyewhite-l/frame-09.png",
+        "expressions/eyewhite-l/frame-10.png",
+        "expressions/eyewhite-l/frame-11.png",
+        "expressions/eyewhite-l/frame-12.png",
+        "expressions/eyewhite-l/frame-13.png",
+        "expressions/eyewhite-l/frame-14.png",
+        "expressions/eyewhite-l/frame-15.png"
+      ],
+      "eyelash-r": [
+        "expressions/eyelash-r/frame-00.png",
+        "expressions/eyelash-r/frame-01.png",
+        "expressions/eyelash-r/frame-02.png",
+        "expressions/eyelash-r/frame-03.png",
+        "expressions/eyelash-r/frame-04.png",
+        "expressions/eyelash-r/frame-05.png",
+        "expressions/eyelash-r/frame-06.png",
+        "expressions/eyelash-r/frame-07.png",
+        "expressions/eyelash-r/frame-08.png",
+        "expressions/eyelash-r/frame-09.png",
+        "expressions/eyelash-r/frame-10.png",
+        "expressions/eyelash-r/frame-11.png",
+        "expressions/eyelash-r/frame-12.png",
+        "expressions/eyelash-r/frame-13.png",
+        "expressions/eyelash-r/frame-14.png",
+        "expressions/eyelash-r/frame-15.png"
+      ],
+      "eyelash-l": [
+        "expressions/eyelash-l/frame-00.png",
+        "expressions/eyelash-l/frame-01.png",
+        "expressions/eyelash-l/frame-02.png",
+        "expressions/eyelash-l/frame-03.png",
+        "expressions/eyelash-l/frame-04.png",
+        "expressions/eyelash-l/frame-05.png",
+        "expressions/eyelash-l/frame-06.png",
+        "expressions/eyelash-l/frame-07.png",
+        "expressions/eyelash-l/frame-08.png",
+        "expressions/eyelash-l/frame-09.png",
+        "expressions/eyelash-l/frame-10.png",
+        "expressions/eyelash-l/frame-11.png",
+        "expressions/eyelash-l/frame-12.png",
+        "expressions/eyelash-l/frame-13.png",
+        "expressions/eyelash-l/frame-14.png",
+        "expressions/eyelash-l/frame-15.png"
+      ],
+      "mouth": [
+        "expressions/mouth/frame-00.png",
+        "expressions/mouth/frame-01.png",
+        "expressions/mouth/frame-02.png",
+        "expressions/mouth/frame-03.png",
+        "expressions/mouth/frame-04.png",
+        "expressions/mouth/frame-05.png",
+        "expressions/mouth/frame-06.png",
+        "expressions/mouth/frame-07.png",
+        "expressions/mouth/frame-08.png",
+        "expressions/mouth/frame-09.png",
+        "expressions/mouth/frame-10.png",
+        "expressions/mouth/frame-11.png",
+        "expressions/mouth/frame-12.png",
+        "expressions/mouth/frame-13.png",
+        "expressions/mouth/frame-14.png",
+        "expressions/mouth/frame-15.png"
+      ]
+    },
+    "eyeClips": [
+      {
+        "white": "eyewhite-r",
+        "iris": "irides-r",
+        "closing": 0.6323529411764706
+      },
+      {
+        "white": "eyewhite-l",
+        "iris": "irides-l",
+        "closing": 0.6417910447761194
+      }
+    ],
+    "gazeRange": [
+      8,
+      6
+    ],
+    "clothDeformations": [
+      {
+        "slot": "topwear",
+        "driver": "torso",
+        "region": [
+          385,
+          390,
+          180,
+          140
+        ],
+        "waistY": 390,
+        "shoulderY": 477,
+        "rows": 8,
+        "compression": 0.015,
+        "angleLimit": 1.4
+      }
+    ],
+    "hairstyleDesigns": [
+      {
+        "id": "classic",
+        "title": "经典双马尾",
+        "slots": [
+          "back hair",
+          "front hair",
+          "ahoge"
+        ],
+        "variant": "hair-original"
+      }
+    ],
+    "composites": [
+      {
+        "id": "front-hair-modules",
+        "bone": "hair-front",
+        "sourceOver": true,
+        "slots": [
+          "front hair",
+          "side lock left",
+          "side lock right"
+        ]
+      }
+    ],
+    "mouthShapes": [
+      {
+        "id": "a",
+        "title": "A · 张口",
+        "forms": [
+          "expressions/mouth/frame-00.png",
+          "expressions/mouth-shapes/a/frame-01.png",
+          "expressions/mouth-shapes/a/frame-02.png",
+          "expressions/mouth-shapes/a/frame-03.png",
+          "expressions/mouth-shapes/a/frame-04.png",
+          "expressions/mouth-shapes/a/frame-05.png",
+          "expressions/mouth-shapes/a/frame-06.png",
+          "expressions/mouth-shapes/a/frame-07.png",
+          "expressions/mouth-shapes/a/frame-08.png"
+        ]
+      },
+      {
+        "id": "i",
+        "title": "I · 扁口露齿",
+        "forms": [
+          "expressions/mouth/frame-00.png",
+          "expressions/mouth-shapes/i/frame-01.png",
+          "expressions/mouth-shapes/i/frame-02.png",
+          "expressions/mouth-shapes/i/frame-03.png",
+          "expressions/mouth-shapes/i/frame-04.png",
+          "expressions/mouth-shapes/i/frame-05.png",
+          "expressions/mouth-shapes/i/frame-06.png",
+          "expressions/mouth-shapes/i/frame-07.png",
+          "expressions/mouth-shapes/i/frame-08.png"
+        ]
+      },
+      {
+        "id": "u",
+        "title": "U · 撮口",
+        "forms": [
+          "expressions/mouth/frame-00.png",
+          "expressions/mouth-shapes/u/frame-01.png",
+          "expressions/mouth-shapes/u/frame-02.png",
+          "expressions/mouth-shapes/u/frame-03.png",
+          "expressions/mouth-shapes/u/frame-04.png",
+          "expressions/mouth-shapes/u/frame-05.png",
+          "expressions/mouth-shapes/u/frame-06.png",
+          "expressions/mouth-shapes/u/frame-07.png",
+          "expressions/mouth-shapes/u/frame-08.png"
+        ]
+      },
+      {
+        "id": "e",
+        "title": "E · 横向开口",
+        "forms": [
+          "expressions/mouth/frame-00.png",
+          "expressions/mouth-shapes/e/frame-01.png",
+          "expressions/mouth-shapes/e/frame-02.png",
+          "expressions/mouth-shapes/e/frame-03.png",
+          "expressions/mouth-shapes/e/frame-04.png",
+          "expressions/mouth-shapes/e/frame-05.png",
+          "expressions/mouth-shapes/e/frame-06.png",
+          "expressions/mouth-shapes/e/frame-07.png",
+          "expressions/mouth-shapes/e/frame-08.png"
+        ]
+      },
+      {
+        "id": "o",
+        "title": "O · 圆口",
+        "forms": [
+          "expressions/mouth/frame-00.png",
+          "expressions/mouth-shapes/o/frame-01.png",
+          "expressions/mouth-shapes/o/frame-02.png",
+          "expressions/mouth-shapes/o/frame-03.png",
+          "expressions/mouth-shapes/o/frame-04.png",
+          "expressions/mouth-shapes/o/frame-05.png",
+          "expressions/mouth-shapes/o/frame-06.png",
+          "expressions/mouth-shapes/o/frame-07.png",
+          "expressions/mouth-shapes/o/frame-08.png"
+        ]
+      },
+      {
+        "id": "smile",
+        "title": "笑口",
+        "forms": [
+          "expressions/mouth/frame-00.png",
+          "expressions/mouth-shapes/smile-v2/frame-01.png",
+          "expressions/mouth-shapes/smile-v2/frame-02.png",
+          "expressions/mouth-shapes/smile-v2/frame-03.png",
+          "expressions/mouth-shapes/smile-v2/frame-04.png",
+          "expressions/mouth-shapes/smile-v2/frame-05.png",
+          "expressions/mouth-shapes/smile-v2/frame-06.png",
+          "expressions/mouth-shapes/smile-v2/frame-07.png",
+          "expressions/mouth-shapes/smile-v2/frame-08.png"
+        ]
+      },
+      {
+        "id": "f",
+        "title": "F/V · 唇齿",
+        "forms": [
+          "expressions/mouth/frame-00.png",
+          "expressions/mouth-shapes/f/frame-01.png",
+          "expressions/mouth-shapes/f/frame-02.png",
+          "expressions/mouth-shapes/f/frame-03.png",
+          "expressions/mouth-shapes/f/frame-04.png",
+          "expressions/mouth-shapes/f/frame-05.png",
+          "expressions/mouth-shapes/f/frame-06.png",
+          "expressions/mouth-shapes/f/frame-07.png",
+          "expressions/mouth-shapes/f/frame-08.png"
+        ]
+      },
+      {
+        "id": "t",
+        "title": "舌尖口形",
+        "forms": [
+          "expressions/mouth/frame-00.png",
+          "expressions/mouth-shapes/t/frame-01.png",
+          "expressions/mouth-shapes/t/frame-02.png",
+          "expressions/mouth-shapes/t/frame-03.png",
+          "expressions/mouth-shapes/t/frame-04.png",
+          "expressions/mouth-shapes/t/frame-05.png",
+          "expressions/mouth-shapes/t/frame-06.png",
+          "expressions/mouth-shapes/t/frame-07.png",
+          "expressions/mouth-shapes/t/frame-08.png"
+        ]
+      }
+    ]
+  },
+  "cutoutPlayback": {
+    "thinkingClip": "thinking-classic",
+    "alternativeThinkingClips": [
+      "thinking"
+    ],
+    "mouthOpenness": [
+      0,
+      0,
+      1,
+      0.6,
+      0.3,
+      0.65,
+      0.22,
+      0.08,
+      0.32,
+      0.15,
+      0.1,
+      1
+    ],
+    "originalAlphaBounds": [
+      0,
+      16,
+      384,
+      502
+    ],
+    "cutoutAlphaBounds": [
+      149,
+      37,
+      884,
+      992
+    ],
+    "visibleHeightAt100Percent": 159.46875,
+    "mouthShapeIDs": [
+      "default",
+      "default",
+      "a",
+      "e",
+      "i",
+      "o",
+      "u",
+      "f",
+      "t",
+      "i",
+      "a",
+      "o"
+    ]
+  },
+  "schemaVersion": 1
+}

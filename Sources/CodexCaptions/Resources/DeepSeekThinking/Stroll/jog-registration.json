@@ -1,0 +1,98 @@
+[
+  {
+    "dx" : 5.0000000000000568,
+    "dy" : 0,
+    "footLift" : 1,
+    "frame" : 12,
+    "scale" : 1,
+    "source" : "output\/fix-run-animation\/before\/frame-12.png"
+  },
+  {
+    "dx" : 5.1283066600670963,
+    "dy" : -14.809338772290175,
+    "footLift" : 1,
+    "frame" : 13,
+    "scale" : 0.42450413136939208,
+    "source" : "output\/fix-run-animation\/individual\/frame-01.png"
+  },
+  {
+    "dx" : 11.403880168748174,
+    "dy" : -8.6664699298986534,
+    "footLift" : 1,
+    "frame" : 14,
+    "scale" : 0.41545608594055955,
+    "source" : "output\/fix-run-animation\/individual\/frame-02.png"
+  },
+  {
+    "dx" : -21.964472309299879,
+    "dy" : -34.114942528735583,
+    "footLift" : 1,
+    "frame" : 15,
+    "scale" : 0.44723092998955072,
+    "source" : "output\/fix-run-animation\/individual\/frame-03.png"
+  },
+  {
+    "dx" : 1.9775081712924703,
+    "dy" : -4.1534770258215303,
+    "footLift" : 34,
+    "frame" : 16,
+    "scale" : 0.42760836633370203,
+    "source" : "output\/fix-run-animation\/individual\/frame-04.png"
+  },
+  {
+    "dx" : 14.312072770332122,
+    "dy" : 10.583439589748082,
+    "footLift" : 26,
+    "frame" : 17,
+    "scale" : 0.41545608594055955,
+    "source" : "output\/fix-run-animation\/individual\/frame-05.png"
+  },
+  {
+    "dx" : 12.053030303030312,
+    "dy" : -20.097447380206063,
+    "footLift" : 2,
+    "frame" : 18,
+    "scale" : 0.41768174354381254,
+    "source" : "output\/fix-run-animation\/individual\/frame-06.png"
+  },
+  {
+    "dx" : 3.3664607090394725,
+    "dy" : -17.288688988838885,
+    "footLift" : 1,
+    "frame" : 19,
+    "scale" : 0.42373510214589677,
+    "source" : "output\/fix-run-animation\/individual\/frame-07.png"
+  },
+  {
+    "dx" : 17.762322787022356,
+    "dy" : 1.9760452523299818,
+    "footLift" : 1,
+    "frame" : 20,
+    "scale" : 0.40963533517431705,
+    "source" : "output\/fix-run-animation\/near-knee-forward-source.png"
+  },
+  {
+    "dx" : 11.421818687139421,
+    "dy" : -5.0464769185512068,
+    "footLift" : 1,
+    "frame" : 21,
+    "scale" : 0.40397543417018139,
+    "source" : "output\/fix-run-animation\/individual\/frame-09.png"
+  },
+  {
+    "dx" : 4.2792983973283185,
+    "dy" : 3.3525631178799813,
+    "footLift" : 41,
+    "frame" : 22,
+    "scale" : 0.42450413136939208,
+    "source" : "output\/fix-run-animation\/individual\/frame-10.png"
+  },
+  {
+    "dx" : 15.390787952765379,
+    "dy" : 12.093052588749856,
+    "footLift" : 27,
+    "frame" : 23,
+    "scale" : 0.41398544492838057,
+    "source" : "output\/fix-run-animation\/individual\/frame-11.png"
+  }
+]

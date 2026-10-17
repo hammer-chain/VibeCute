@@ -1,0 +1,308 @@
+{
+  "name": "DeepSeek Window Edge Sitting v2 — hair palette correction",
+  "version": 2,
+  "frame_size": [
+    448,
+    640
+  ],
+  "frame_count": 24,
+  "frame_duration_ms": 120,
+  "duration_ms": 2880,
+  "loop": true,
+  "window_edge_anchor_px": [
+    210,
+    435
+  ],
+  "hand_contact_px": {
+    "left": [
+      90,
+      435
+    ],
+    "right": [
+      332,
+      435
+    ]
+  },
+  "coordinate_system": "top-left origin, x right, y down",
+  "source_has_window": false,
+  "source_alpha": true,
+  "motion": {
+    "upper_body": "Subtle generated shoulder/chest breathing; head follows gently; palms and support fixed.",
+    "legs": "One forward while the other backward, exact 6/12 phase offset; front-facing depth shown through foreshortening, larger shoe sole and tucked-back foot.",
+    "tail": "Gentle independent tail arc, smoothly reverses through the same generated poses.",
+    "breath_ms": 2880,
+    "tail_ms": 2880,
+    "leg_cycle_ms": 1440
+  },
+  "assembly": "Imagegen artwork, mechanical extraction, registration and layered sprite compositing. No optical-flow morphing; contact patches fixed.",
+  "frames": [
+    {
+      "frame": 0,
+      "time_ms": 0,
+      "breath_pose": 0,
+      "tail_pose": 0,
+      "viewer_left_leg_phase": 0,
+      "viewer_right_leg_phase": 6,
+      "left_depth": 0.0,
+      "right_depth": 0.0,
+      "duration_ms": 120
+    },
+    {
+      "frame": 1,
+      "time_ms": 120,
+      "breath_pose": 0,
+      "tail_pose": 0,
+      "viewer_left_leg_phase": 1,
+      "viewer_right_leg_phase": 7,
+      "left_depth": 0.5,
+      "right_depth": -0.5,
+      "duration_ms": 120
+    },
+    {
+      "frame": 2,
+      "time_ms": 240,
+      "breath_pose": 1,
+      "tail_pose": 1,
+      "viewer_left_leg_phase": 2,
+      "viewer_right_leg_phase": 8,
+      "left_depth": 0.866025,
+      "right_depth": -0.866025,
+      "duration_ms": 120
+    },
+    {
+      "frame": 3,
+      "time_ms": 360,
+      "breath_pose": 1,
+      "tail_pose": 1,
+      "viewer_left_leg_phase": 3,
+      "viewer_right_leg_phase": 9,
+      "left_depth": 1.0,
+      "right_depth": -1.0,
+      "duration_ms": 120
+    },
+    {
+      "frame": 4,
+      "time_ms": 480,
+      "breath_pose": 2,
+      "tail_pose": 2,
+      "viewer_left_leg_phase": 4,
+      "viewer_right_leg_phase": 10,
+      "left_depth": 0.866025,
+      "right_depth": -0.866025,
+      "duration_ms": 120
+    },
+    {
+      "frame": 5,
+      "time_ms": 600,
+      "breath_pose": 2,
+      "tail_pose": 2,
+      "viewer_left_leg_phase": 5,
+      "viewer_right_leg_phase": 11,
+      "left_depth": 0.5,
+      "right_depth": -0.5,
+      "duration_ms": 120
+    },
+    {
+      "frame": 6,
+      "time_ms": 720,
+      "breath_pose": 3,
+      "tail_pose": 3,
+      "viewer_left_leg_phase": 6,
+      "viewer_right_leg_phase": 0,
+      "left_depth": 0.0,
+      "right_depth": 0.0,
+      "duration_ms": 120
+    },
+    {
+      "frame": 7,
+      "time_ms": 840,
+      "breath_pose": 3,
+      "tail_pose": 3,
+      "viewer_left_leg_phase": 7,
+      "viewer_right_leg_phase": 1,
+      "left_depth": -0.5,
+      "right_depth": 0.5,
+      "duration_ms": 120
+    },
+    {
+      "frame": 8,
+      "time_ms": 960,
+      "breath_pose": 2,
+      "tail_pose": 2,
+      "viewer_left_leg_phase": 8,
+      "viewer_right_leg_phase": 2,
+      "left_depth": -0.866025,
+      "right_depth": 0.866025,
+      "duration_ms": 120
+    },
+    {
+      "frame": 9,
+      "time_ms": 1080,
+      "breath_pose": 2,
+      "tail_pose": 2,
+      "viewer_left_leg_phase": 9,
+      "viewer_right_leg_phase": 3,
+      "left_depth": -1.0,
+      "right_depth": 1.0,
+      "duration_ms": 120
+    },
+    {
+      "frame": 10,
+      "time_ms": 1200,
+      "breath_pose": 1,
+      "tail_pose": 1,
+      "viewer_left_leg_phase": 10,
+      "viewer_right_leg_phase": 4,
+      "left_depth": -0.866025,
+      "right_depth": 0.866025,
+      "duration_ms": 120
+    },
+    {
+      "frame": 11,
+      "time_ms": 1320,
+      "breath_pose": 1,
+      "tail_pose": 1,
+      "viewer_left_leg_phase": 11,
+      "viewer_right_leg_phase": 5,
+      "left_depth": -0.5,
+      "right_depth": 0.5,
+      "duration_ms": 120
+    },
+    {
+      "frame": 12,
+      "time_ms": 1440,
+      "breath_pose": 0,
+      "tail_pose": 0,
+      "viewer_left_leg_phase": 0,
+      "viewer_right_leg_phase": 6,
+      "left_depth": 0.0,
+      "right_depth": 0.0,
+      "duration_ms": 120
+    },
+    {
+      "frame": 13,
+      "time_ms": 1560,
+      "breath_pose": 0,
+      "tail_pose": 0,
+      "viewer_left_leg_phase": 1,
+      "viewer_right_leg_phase": 7,
+      "left_depth": 0.5,
+      "right_depth": -0.5,
+      "duration_ms": 120
+    },
+    {
+      "frame": 14,
+      "time_ms": 1680,
+      "breath_pose": 11,
+      "tail_pose": 4,
+      "viewer_left_leg_phase": 2,
+      "viewer_right_leg_phase": 8,
+      "left_depth": 0.866025,
+      "right_depth": -0.866025,
+      "duration_ms": 120
+    },
+    {
+      "frame": 15,
+      "time_ms": 1800,
+      "breath_pose": 11,
+      "tail_pose": 4,
+      "viewer_left_leg_phase": 3,
+      "viewer_right_leg_phase": 9,
+      "left_depth": 1.0,
+      "right_depth": -1.0,
+      "duration_ms": 120
+    },
+    {
+      "frame": 16,
+      "time_ms": 1920,
+      "breath_pose": 10,
+      "tail_pose": 5,
+      "viewer_left_leg_phase": 4,
+      "viewer_right_leg_phase": 10,
+      "left_depth": 0.866025,
+      "right_depth": -0.866025,
+      "duration_ms": 120
+    },
+    {
+      "frame": 17,
+      "time_ms": 2040,
+      "breath_pose": 10,
+      "tail_pose": 5,
+      "viewer_left_leg_phase": 5,
+      "viewer_right_leg_phase": 11,
+      "left_depth": 0.5,
+      "right_depth": -0.5,
+      "duration_ms": 120
+    },
+    {
+      "frame": 18,
+      "time_ms": 2160,
+      "breath_pose": 9,
+      "tail_pose": 6,
+      "viewer_left_leg_phase": 6,
+      "viewer_right_leg_phase": 0,
+      "left_depth": 0.0,
+      "right_depth": 0.0,
+      "duration_ms": 120
+    },
+    {
+      "frame": 19,
+      "time_ms": 2280,
+      "breath_pose": 9,
+      "tail_pose": 6,
+      "viewer_left_leg_phase": 7,
+      "viewer_right_leg_phase": 1,
+      "left_depth": -0.5,
+      "right_depth": 0.5,
+      "duration_ms": 120
+    },
+    {
+      "frame": 20,
+      "time_ms": 2400,
+      "breath_pose": 10,
+      "tail_pose": 5,
+      "viewer_left_leg_phase": 8,
+      "viewer_right_leg_phase": 2,
+      "left_depth": -0.866025,
+      "right_depth": 0.866025,
+      "duration_ms": 120
+    },
+    {
+      "frame": 21,
+      "time_ms": 2520,
+      "breath_pose": 10,
+      "tail_pose": 5,
+      "viewer_left_leg_phase": 9,
+      "viewer_right_leg_phase": 3,
+      "left_depth": -1.0,
+      "right_depth": 1.0,
+      "duration_ms": 120
+    },
+    {
+      "frame": 22,
+      "time_ms": 2640,
+      "breath_pose": 11,
+      "tail_pose": 4,
+      "viewer_left_leg_phase": 10,
+      "viewer_right_leg_phase": 4,
+      "left_depth": -0.866025,
+      "right_depth": 0.866025,
+      "duration_ms": 120
+    },
+    {
+      "frame": 23,
+      "time_ms": 2760,
+      "breath_pose": 11,
+      "tail_pose": 4,
+      "viewer_left_leg_phase": 11,
+      "viewer_right_leg_phase": 5,
+      "left_depth": -0.5,
+      "right_depth": 0.5,
+      "duration_ms": 120
+    }
+  ],
+  "palette_revision": "hair-hsv-srgb-2026-10-06",
+  "frames_directory": "Loop",
+  "source_pixel_guarantee": "Alpha identical for every source pixel; RGB outside each hair mask identical; no character pixel is resampled or moved.",
+  "runtime_hair_calibration": "Matched in sRGB pixel space to confirmed seated crown and ends; original alpha and RGB outside hair masks unchanged"
+}

@@ -1,0 +1,66 @@
+[
+  {
+    "dx" : 4.1079646017699361,
+    "dy" : -4.9575221238937957,
+    "footLift" : 1,
+    "frame" : 0,
+    "scale" : 0.4230088495575221,
+    "source" : "output\/fix-run-animation\/cover-return\/generated\/frame-00.png"
+  },
+  {
+    "dx" : -0.875,
+    "dy" : -19.832720588235361,
+    "footLift" : 1,
+    "frame" : 1,
+    "scale" : 0.42830882352941174,
+    "source" : "output\/fix-run-animation\/cover-return\/generated\/frame-01.png"
+  },
+  {
+    "dx" : 4.6810810810810608,
+    "dy" : 1.5621621621621671,
+    "footLift" : 34,
+    "frame" : 2,
+    "scale" : 0.42162162162162165,
+    "source" : "output\/fix-run-animation\/cover-return\/generated\/frame-02.png"
+  },
+  {
+    "dx" : 4.5497287522604211,
+    "dy" : 2.0235081374321453,
+    "footLift" : 26,
+    "frame" : 3,
+    "scale" : 0.42133815551537068,
+    "source" : "output\/fix-run-animation\/cover-return\/generated\/frame-03.png"
+  },
+  {
+    "dx" : -2.1263940520445885,
+    "dy" : -6.5985130111523631,
+    "footLift" : 2,
+    "frame" : 4,
+    "scale" : 0.43122676579925651,
+    "source" : "output\/fix-run-animation\/cover-return\/generated\/frame-04.png"
+  },
+  {
+    "dx" : 9.0232558139534831,
+    "dy" : 1.1627906976743816,
+    "footLift" : 1,
+    "frame" : 5,
+    "scale" : 0.41860465116279072,
+    "source" : "output\/fix-run-animation\/cover-return\/generated\/frame-05.png"
+  },
+  {
+    "dx" : 3.2857142857143344,
+    "dy" : 0.59132007233267814,
+    "footLift" : 41,
+    "frame" : 6,
+    "scale" : 0.42133815551537068,
+    "source" : "output\/fix-run-animation\/cover-return\/generated\/frame-06.png"
+  },
+  {
+    "dx" : 3.2486388384755287,
+    "dy" : -4.1125226860253861,
+    "footLift" : 27,
+    "frame" : 7,
+    "scale" : 0.42468239564428312,
+    "source" : "output\/fix-run-animation\/cover-return\/generated\/frame-07.png"
+  }
+]

@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "profile": "release",
+  "bundle_id": "app.vibecute.desktop",
+  "app_name": "VibeCute",
+  "minimum_macos": "15.0",
+  "tempo": "beatnet",
+  "lip": "mfcc",
+  "features": {
+    "kira": false,
+    "speech": false,
+    "vocal_separation": false,
+    "cutout": false,
+    "studio": false,
+    "developer_tools": false
+  },
+  "resource_directories": [
+    "DeepSeekThinking",
+    "OrangeHoodieThinking",
+    "CodexThinking",
+    "OpenCodeNavigation"
+  ],
+  "resource_files": [
+    "LipVowels.json"
+  ],
+  "excluded_resources": [
+    "DeepSeekThinking/Kira"
+  ],
+  "beatnet_model_sha256": "f1c1143ae016c7d525156591f6a99d864d1ddcc19129ae33982d08a6a4c41c5c",
+  "excluded_resource_globs": [
+    "**/*prompt.txt",
+    "**/README.md"
+  ],
+  "legal_documents": {
+    "LICENSE-ASSETS.md": "LICENSE-ASSETS.md",
+    "CC-BY-NC-SA-4.0.txt": "Resources/CC-BY-NC-SA-4.0.txt",
+    "THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md",
+    "LICENSE": "LICENSE"
+  }
+}

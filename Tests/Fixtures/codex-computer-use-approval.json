@@ -1,0 +1,36 @@
+{
+  "id": 17,
+  "method": "mcpServer/elicitation/request",
+  "params": {
+    "_meta": {
+      "codex_approval_kind": "mcp_tool_call",
+      "connector_id": "computer-use",
+      "connector_name": "Computer Use",
+      "persist": [
+        "session",
+        "always"
+      ],
+      "riskLevel": "low",
+      "tool_name": "get_app_state",
+      "tool_params": {
+        "app": "app.vibecute.desktop.edge-qa-backstep-v4"
+      },
+      "tool_params_display": [
+        {
+          "display_name": "App",
+          "name": "app",
+          "value": "思考字幕后撤验收"
+        }
+      ]
+    },
+    "message": "Allow Computer Use to use \"思考字幕后撤验收\"?",
+    "mode": "form",
+    "requestedSchema": {
+      "properties": {},
+      "type": "object"
+    },
+    "serverName": "cua_repl",
+    "threadId": "thread-fixture",
+    "turnId": "turn-fixture"
+  }
+}

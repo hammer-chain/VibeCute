@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+    <key>CFBundleName</key><string>VibeCute</string>
+    <key>CFBundleDisplayName</key><string>VibeCute</string>
+    <key>CFBundleExecutable</key><string>CodexCaptions</string>
+    <key>CFBundleIdentifier</key><string>app.vibecute.desktop</string>
+    <key>CFBundleVersion</key><string>1</string>
+    <key>CFBundleShortVersionString</key><string>0.1.0</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key><string>13.0</string>
+    <key>LSUIElement</key><true/>
+    <key>NSHighResolutionCapable</key><true/>
+    <key>NSAppleEventsUsageDescription</key><string>点击 Claude Code 会话名称时，定位并聚焦该会话对应的终端窗口或标签页，不向终端输入命令。</string>
+    <key>NSAudioCaptureUsageDescription</key><string>用于在本机实时分析系统播放声音，驱动角色口型。音频不会保存或上传。</string>
+    <key>NSSpeechRecognitionUsageDescription</key><string>在本机识别系统播放声音中的日语「構わない」，触发角色 Kira 倒计时。仅使用离线识别，不保存或上传声音。</string>
+    <key>NSScreenCaptureUsageDescription</key><string>用于在本机检查角色后面的文字与纯色空白区域，自动避让遮挡。屏幕画面和识别文字不会保存或上传。</string>
+    <key>NSSupportsAutomaticGraphicsSwitching</key><true/>
+</dict></plist>

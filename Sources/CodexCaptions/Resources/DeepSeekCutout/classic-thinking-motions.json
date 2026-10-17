@@ -1,0 +1,1120 @@
+{
+  "schemaVersion": 1,
+  "clips": [
+    {
+      "id": "idle",
+      "title": "原位组装 · 中性",
+      "duration": 4,
+      "loop": true,
+      "tracks": []
+    },
+    {
+      "id": "thinking",
+      "title": "歪头思考 · 发梢轻摆",
+      "duration": 8,
+      "loop": true,
+      "constraints": [
+        "right-chin-contact"
+      ],
+      "tracks": [
+        {
+          "bone": "torso",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.55,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.45,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 1.4
+              }
+            },
+            {
+              "time": 3.55,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 1.4
+              }
+            },
+            {
+              "time": 4.45,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 4.85,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 5.75,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -1
+              }
+            },
+            {
+              "time": 7.15,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -1
+              }
+            },
+            {
+              "time": 7.95,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "head",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.7,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.6,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 4.6
+              }
+            },
+            {
+              "time": 3.4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 4.6
+              }
+            },
+            {
+              "time": 4.3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 5,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 5.9,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -3.5
+              }
+            },
+            {
+              "time": 7,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -3.5
+              }
+            },
+            {
+              "time": 7.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "hair-back",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.7,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.35
+              }
+            },
+            {
+              "time": 1.6,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.22
+              }
+            },
+            {
+              "time": 1.95,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.12
+              }
+            },
+            {
+              "time": 2.6,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3.3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.3
+              }
+            },
+            {
+              "time": 4.3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.18
+              }
+            },
+            {
+              "time": 4.65,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.1
+              }
+            },
+            {
+              "time": 4.95,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 5,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 5.4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.28
+              }
+            },
+            {
+              "time": 5.9,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.17
+              }
+            },
+            {
+              "time": 6.2,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.1
+              }
+            },
+            {
+              "time": 6.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 7,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 7.4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.25
+              }
+            },
+            {
+              "time": 7.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.12
+              }
+            },
+            {
+              "time": 7.95,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.04
+              }
+            },
+            {
+              "time": 8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "thinking-classic",
+      "title": "思考 · 原版节奏",
+      "duration": 2.88,
+      "loop": true,
+      "constraints": [
+        "right-chin-contact"
+      ],
+      "tracks": [
+        {
+          "bone": "torso",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -1
+              }
+            },
+            {
+              "time": 1.36,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -1
+              }
+            },
+            {
+              "time": 1.44,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.75
+              }
+            },
+            {
+              "time": 1.52,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.75
+              }
+            },
+            {
+              "time": 1.62,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.84,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.9,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.1
+              }
+            },
+            {
+              "time": 2.76,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.1
+              }
+            },
+            {
+              "time": 2.87,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.88,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "head",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            },
+            {
+              "time": 1.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            },
+            {
+              "time": 1.02,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.10400000000000002
+              }
+            },
+            {
+              "time": 1.1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -7.064000000000002
+              }
+            },
+            {
+              "time": 1.12,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -8.0
+              }
+            },
+            {
+              "time": 1.36,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -8.0
+              }
+            },
+            {
+              "time": 1.44,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -6.25
+              }
+            },
+            {
+              "time": 1.52,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -6.25
+              }
+            },
+            {
+              "time": 1.6,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.07799999999999985
+              }
+            },
+            {
+              "time": 1.62,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            },
+            {
+              "time": 1.84,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            },
+            {
+              "time": 1.9,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.7437499999999992
+              }
+            },
+            {
+              "time": 1.92,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.9
+              }
+            },
+            {
+              "time": 2.76,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.9
+              }
+            },
+            {
+              "time": 2.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.930052592036063
+              }
+            },
+            {
+              "time": 2.87,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.04296874999999811
+              }
+            },
+            {
+              "time": 2.88,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "hair-back",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.02,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.15,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.28
+              }
+            },
+            {
+              "time": 1.28,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.1
+              }
+            },
+            {
+              "time": 1.36,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.48,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.18
+              }
+            },
+            {
+              "time": 1.63,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.28
+              }
+            },
+            {
+              "time": 1.76,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.1
+              }
+            },
+            {
+              "time": 1.88,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.96,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.1
+              }
+            },
+            {
+              "time": 2.08,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.88,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ],
+      "blink": [
+        {
+          "time": 0,
+          "value": 0
+        },
+        {
+          "time": 1.4,
+          "value": 0
+        },
+        {
+          "time": 1.44,
+          "value": 0.7
+        },
+        {
+          "time": 1.56,
+          "value": 0.7
+        },
+        {
+          "time": 1.6,
+          "value": 1
+        },
+        {
+          "time": 1.72,
+          "value": 1
+        },
+        {
+          "time": 1.76,
+          "value": 0
+        },
+        {
+          "time": 2.88,
+          "value": 0
+        }
+      ]
+    },
+    {
+      "id": "tail-wag",
+      "title": "独立摆尾",
+      "duration": 4,
+      "loop": true,
+      "tracks": [
+        {
+          "bone": "tail",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 6
+              }
+            },
+            {
+              "time": 2.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -6
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hair-sway",
+      "title": "后发与呆毛 · 独立摆动",
+      "duration": 4,
+      "loop": true,
+      "tracks": [
+        {
+          "bone": "hair-back",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            },
+            {
+              "time": 1.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 1.5
+              }
+            },
+            {
+              "time": 2.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            },
+            {
+              "time": 3.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -1.5
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "ahoge",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 4
+              }
+            },
+            {
+              "time": 2.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -4
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "head-sway",
+      "title": "歪头 · 贴颊手约束",
+      "duration": 4,
+      "loop": true,
+      "tracks": [
+        {
+          "bone": "head",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 6
+              }
+            },
+            {
+              "time": 2.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -6
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ],
+      "constraints": [
+        "right-chin-contact"
+      ]
+    },
+    {
+      "id": "arm-probe",
+      "title": "肩袖衔接诊断 · 待分关节",
+      "duration": 4,
+      "loop": true,
+      "tracks": [
+        {
+          "bone": "arm-left",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 3
+              }
+            },
+            {
+              "time": 2.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -3
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "right-elbow-probe",
+      "title": "右肘屈伸 · 接缝诊断",
+      "duration": 4,
+      "loop": true,
+      "tracks": [
+        {
+          "bone": "right-elbow",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 12
+              }
+            },
+            {
+              "time": 2,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -12
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "right-wrist",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -8
+              }
+            },
+            {
+              "time": 2,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 8
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

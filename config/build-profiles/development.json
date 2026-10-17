@@ -1,0 +1,35 @@
+{
+  "schema": 1,
+  "profile": "development",
+  "bundle_id": "app.vibecute.desktop.dev",
+  "app_name": "VibeCute Dev",
+  "minimum_macos": "15.0",
+  "tempo": "selectable",
+  "lip": "selectable",
+  "features": {
+    "kira": true,
+    "speech": true,
+    "vocal_separation": true,
+    "cutout": true,
+    "studio": true,
+    "developer_tools": true
+  },
+  "resource_directories": [
+    "DeepSeekThinking",
+    "OrangeHoodieThinking",
+    "CodexThinking",
+    "OpenCodeNavigation",
+    "DeepSeekCutout",
+    "CutoutCharacters"
+  ],
+  "resource_files": [
+    "LipVowels.json"
+  ],
+  "excluded_resources": [],
+  "legal_documents": {
+    "LICENSE-ASSETS.md": "LICENSE-ASSETS.md",
+    "CC-BY-NC-SA-4.0.txt": "Resources/CC-BY-NC-SA-4.0.txt",
+    "THIRD-PARTY-NOTICES.md": "THIRD-PARTY-NOTICES.md",
+    "LICENSE": "LICENSE"
+  }
+}
