@@ -1,0 +1,5 @@
+# Exclude upstream implementations from GitHub language statistics.
+Sources/AubioBridge/vendor/** linguist-vendored
+Sources/BTrackBridge/vendor/** linguist-vendored
+Sources/BeatNetBridge/vendor/** linguist-vendored
+Sources/SamplerateBridge/** linguist-vendored

@@ -56,3 +56,6 @@ xcuserdata/
 *.cer
 *.crt
 *.der
+
+# Local development handoff notes
+/HANDOFF.MD
