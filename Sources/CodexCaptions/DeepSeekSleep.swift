@@ -13,7 +13,10 @@ enum DeepSeekSleepTimeline {
         let frame: Int
         let sleepTick: Int?
     }
-    static func sample(at elapsed: TimeInterval) -> Sample? {
+    static func sample(at elapsed: TimeInterval, continuous: Bool = false) -> Sample? {
+        if continuous, elapsed.isFinite, elapsed >= 3.2 {
+            return sample(at: 3.2 + (elapsed - 3.2).truncatingRemainder(dividingBy: 3.84))
+        }
         guard elapsed.isFinite, elapsed >= 0, elapsed < duration else { return nil }
         let step = Int((elapsed / tick).rounded(.down))
         if step < 4 { return Sample(phase: "坐姿思考", waking: false, frame: 0, sleepTick: nil) }

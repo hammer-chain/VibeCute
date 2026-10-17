@@ -912,6 +912,7 @@ final class ProjectOverlays {
                 case .workbuddy: name = "WorkBuddy"
                 case .deepseekCutout, .orangeHoodie: name = "DeepSeek"
                 case .companion: name = "独立角色"
+                case .preview: name = "动作预览"
                 }
                 return (name, metrics)
             } : []

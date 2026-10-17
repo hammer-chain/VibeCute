@@ -1,7 +1,7 @@
 import Foundation
 
 enum DeveloperPreviewAction: String, CaseIterable, Identifiable {
-    case thinking, mouth, singing, shortAvoidance, stroll, sleep, singingStep, frontRetreat, windowPeek, windowSeat, kira
+    case thinking, mouth, singing, shortAvoidance, stroll, sleep, sleepContinuous, singingStep, frontRetreat, windowPeek, windowSeat, kira
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -11,6 +11,7 @@ enum DeveloperPreviewAction: String, CaseIterable, Identifiable {
         case .shortAvoidance: return "短程避让动作"
         case .stroll: return "起身小跑"
         case .sleep: return "趴睡与醒来"
+        case .sleepContinuous: return "持续趴睡（不自动醒来）"
         case .singingStep: return "唱歌小步移动"
         case .frontRetreat: return "正面急退"
         case .windowPeek: return "窗口后探头"
