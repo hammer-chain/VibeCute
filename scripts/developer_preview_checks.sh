@@ -1,7 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
-bin=$(swift build --show-bin-path)
+export CAPTIONS_BUILD_PROFILE=development
+unset CAPTIONS_DISTRIBUTION_BUILD
+scratch="$PWD/.build/developer-preview"
+sdk=$(xcrun --show-sdk-path)
+swift build --disable-sandbox --scratch-path "$scratch" -j 4 --product CodexCaptions -Xcxx -isystem -Xcxx "$sdk/usr/include/c++/v1"
+bin=$(swift build --disable-sandbox --scratch-path "$scratch" --show-bin-path)
 objects=()
 while IFS= read -r file; do
     [[ "$file" == */CodexCaptions.build/main.swift.o ]] || objects+=("$file")
@@ -12,5 +17,5 @@ swiftc -module-cache-path .build/clang-cache -parse-as-library -I "$bin/Modules"
     -Xcc "-fmodule-map-file=$bin/AubioBridge.build/module.modulemap" \
     -Xcc "-fmodule-map-file=$bin/BTrackBridge.build/module.modulemap" \
     -Xcc "-fmodule-map-file=$bin/BeatNetBridge.build/module.modulemap" \
-    Tests/DeveloperPreviewChecks.swift "${objects[@]}" -framework Accelerate -lc++ -o .build/developer-preview-checks
+    Tests/DeveloperPreviewChecks.swift "${objects[@]}" -framework Accelerate -lc++ -lsqlite3 -o .build/developer-preview-checks
 .build/developer-preview-checks --preferences-suite local.vibecute.developer-preview-checks --no-audio --no-speech --no-vocal-separation --no-task-sounds --no-question-sounds --no-doubao --no-workbuddy --no-position-memory --sessions-root /tmp/hoodie-empty-sessions --deepseek-root /tmp/hoodie-empty-sessions --claude-root /tmp/hoodie-empty-sessions --opencode-root /tmp/hoodie-empty-sessions --workbuddy-root /tmp/hoodie-empty-sessions

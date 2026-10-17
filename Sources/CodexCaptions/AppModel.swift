@@ -16,9 +16,16 @@ final class AppModel: ObservableObject {
     @Published private(set) var developerPreviewStatus = "选择角色后预览动作"
     private var requestedPreviewCharacter: CharacterChoice?
     private var demoCharacterOverride: CharacterChoice?
+    private var isolatedActionPreview: Bool { demoMode && demoCharacterOverride != nil }
+    private var demoMascot: CaptionMascot {
+        guard isolatedActionPreview else { return demoDeepSeek ? .deepseek : .codex }
+        return CaptionMascot.allCases.first { liveCharacterBindings[$0] == demoCharacterOverride } ?? .preview
+    }
+    var developerPreviewCharacters: [[String: Any]] { overlays.characterDiagnostics }
+    var developerPreviewCaptions: [[String: Any]] { overlays.diagnostics }
     var developerPreviewArtwork: String? {
         guard demoMode else { return nil }
-        return overlays.character(for:demoDeepSeek ? .deepseek : .codex)?.subtitle.mascotArtwork
+        return overlays.character(for:demoMascot)?.subtitle.mascotArtwork
     }
     func previewAction(_ action: DeveloperPreviewAction) {
         guard BuildProfile.experiments else { return }
@@ -36,6 +43,7 @@ final class AppModel: ObservableObject {
             else { showScootDemo() }
         case .stroll: showStrollDemo()
         case .sleep: showSleepDemo()
+        case .sleepContinuous: showSleepDemo(continuous: true)
         case .singingStep: showSingingStepDemo()
         case .frontRetreat: showFrontRetreatDemo()
         case .windowPeek: showWindowPeek()
@@ -133,7 +141,12 @@ final class AppModel: ObservableObject {
         else { taskSoundOutcomes.remove(outcome.rawValue) }
     }
     private var effectiveCharacterBindings: [CaptionMascot: CharacterChoice] {
-        if demoMode { return [.codex: demoPinkBear && CharacterChoice.includesPinkBear ? .pinkBear : .codex, .deepseek: demoCharacterOverride ?? ((CommandLine.arguments.contains("--orange-hoodie-demo") || CommandLine.arguments.contains("--orange-hoodie-avoidance-demo")) ? .orangeHoodie : .deepseek)] }
+        if demoMode && !isolatedActionPreview { return [.codex: demoPinkBear && CharacterChoice.includesPinkBear ? .pinkBear : .codex, .deepseek: demoCharacterOverride ?? ((CommandLine.arguments.contains("--orange-hoodie-demo") || CommandLine.arguments.contains("--orange-hoodie-avoidance-demo")) ? .orangeHoodie : .deepseek)] }
+        var bindings = liveCharacterBindings
+        if isolatedActionPreview, demoMascot == .preview { bindings[.preview] = demoCharacterOverride }
+        return bindings
+    }
+    private var liveCharacterBindings: [CaptionMascot: CharacterChoice] {
         var bindings = Dictionary(uniqueKeysWithValues: SessionSource.allCases.filter { tracks($0) }.map {
             (CaptionMascot(rawValue: $0.preferenceID)!, characterChoice(for: $0))
         })
@@ -377,6 +390,7 @@ final class AppModel: ObservableObject {
     private var backdropLastSafe = false
     private var backdropPermission = false
     private var sleepDemoStartedAt: TimeInterval?
+    private var continuousSleepPreview = false
     private var automaticSleep = false
     private var sleepWakeAt: TimeInterval?
     private var sleepWakeEntryFrame: Int?
@@ -1012,19 +1026,21 @@ final class AppModel: ObservableObject {
         showSingingDemo(); kiraDemo = true; kiraDemoFired = false
     }
 
-    func showSleepDemo() {
+    func showSleepDemo(continuous: Bool = false) {
         guard DeepSeekSleepArtwork.shared.available else { return }
         showDemo(deepSeek: true)
         singingDemoStartedAt = nil; mouthDemoStartedAt = nil; mouthDemoIndex = nil
         speechDemo = false; resetSinging()
         sleepDemoStartedAt = ProcessInfo.processInfo.systemUptime
+        continuousSleepPreview = continuous
         currentText = "困了，趴一会儿……"
-        previewUntil = Date().addingTimeInterval(DeepSeekSleepTimeline.duration+1)
+        previewUntil = continuous ? .distantFuture : Date().addingTimeInterval(DeepSeekSleepTimeline.duration+1)
         redraw(); updateMouth()
     }
 
     private func stopSleepDemo() {
         sleepDemoStartedAt = nil
+        continuousSleepPreview = false
         automaticSleep = false; sleepWakeAt = nil; sleepWakeEntryFrame = nil; sleepAnchor = nil
         overlays.setDeepSeekSleep(nil)
     }
@@ -1816,7 +1832,7 @@ final class AppModel: ObservableObject {
             pendingWindowSeatPreview = false
             showWindowPeek(previewSeat:previewSeat)
         }
-        guard Date() >= previewUntil else { return }
+        guard isolatedActionPreview || Date() >= previewUntil else { return }
         selected = SessionSelection.choose(snapshots, pinned: selection.isEmpty ? nil : selection)
         let groups = Dictionary(grouping: snapshots, by: captionGroup)
         states = states.filter { groups[$0.key] != nil }
@@ -1854,9 +1870,10 @@ final class AppModel: ObservableObject {
         if speechHighlightedKeywords != speechHighlight.keywords { speechHighlightedKeywords = speechHighlight.keywords }
         if speechKeywordEnabled { refreshSpeechProgress() }
         if demoMode {
+            if isolatedActionPreview { states.values.forEach { $0.tick() } }
             if Date() >= previewUntil {
                 if questionPreviewActive { stopPreview() }
-                else { demoMode = false; receive(sessions, error: errorText) }
+                else { stopPreview() }
             } else if let revealAt = questionPreviewRevealAt, Date() >= revealAt {
                 questionPreviewRevealAt = nil
                 let id = "preview:" + UUID().uuidString
@@ -1890,7 +1907,7 @@ final class AppModel: ObservableObject {
 
     private func updateApprovalTracking() {
         guard !CommandLine.arguments.contains("--no-approval-stream") else { return }
-        let relevant = enabled && !demoMode ? sessions.filter { session in
+        let relevant = enabled && (!demoMode || isolatedActionPreview) ? sessions.filter { session in
             session.source == .codex && (selection.isEmpty || session.path == selection)
             // Pending IPC requests do not append to the rollout. A bounded cold
             // log tail can also omit turn_started, so log activity must not gate
@@ -1924,7 +1941,7 @@ final class AppModel: ObservableObject {
 
     private func redraw() {
         updateApprovalTracking()
-        let focusedID = demoMode ? "demo" : selected.map(captionGroup) ?? "waiting"
+        let focusedID = demoMode && !isolatedActionPreview ? "demo" : selected.map(captionGroup) ?? "waiting"
         let focused = states[focusedID]
         let previewTitle = approvalPreview ? "审批预览" : "提问预览"
         let title = demoMode ? (questionPreviewActive ? previewTitle : "VibeCute") : selected?.headerName ?? ""
@@ -1935,7 +1952,7 @@ final class AppModel: ObservableObject {
         var items: [OverlayItem] = []
         if demoMode {
             items = [OverlayItem(id: "demo", text: currentText, header: header, title: title,
-                                 active: !questionPreviewActive, mascot: demoDeepSeek ? .deepseek : .codex,
+                                 active: !questionPreviewActive, mascot: demoMascot,
                                  typewriterID: typewriterEnabled && !questionPreviewActive ? "demo:\(demoTypewriterID)" : nil,
                                  typewriterCharactersPerSecond: typewriterCharactersPerSecond,
                                  question: questionPreviewRequest,
@@ -1958,8 +1975,10 @@ final class AppModel: ObservableObject {
                                          typewriterCharactersPerSecond: typewriterCharactersPerSecond,
                                          onCaptionClose: { [weak self] in self?.stopPreview() }))
             }
-        } else {
-            currentText = focused?.text ?? (errorText ?? "字幕已就绪，等待下一条思考或进度…")
+        }
+        let previewItems = items
+        if !demoMode || isolatedActionPreview {
+            if !demoMode { currentText = focused?.text ?? (errorText ?? "字幕已就绪，等待下一条思考或进度…") }
             let candidates = sessions.filter { session in
                 session.source == .codex && (selection.isEmpty || captionGroup(session) == focusedID)
                     && session.pendingQuestions.contains { !submittedQuestions.contains(session.id + ":" + $0.id)
@@ -2060,11 +2079,18 @@ final class AppModel: ObservableObject {
                                          self?.dismissedErrorText = errorText; self?.redraw() })]
             }
         }
+        if isolatedActionPreview {
+            // Replace only the selected artwork's content; other lanes stay live.
+            items.removeAll { item in
+                item.mascot == demoMascot
+            }
+            items += previewItems
+        }
         let metricsSession = selected?.source == .deepseek ? selected : sessions.first { $0.source == .deepseek }
         let codexMetricsSession = selected?.source == .codex ? selected : sessions.first { $0.source == .codex }
         let openCodeMetricsSession = selected?.source == .opencode ? selected : sessions.first { $0.source == .opencode }
         var restingMascots = Set<CaptionMascot>()
-        if enabled && !demoMode {
+        if enabled && (!demoMode || isolatedActionPreview) {
             if balanceAlertActive { restingMascots.insert(.deepseek) }
             if companionEnabled { restingMascots.insert(companionSource) }
             if !autoHide { restingMascots.formUnion(effectiveCharacterBindings.keys) }
@@ -2081,7 +2107,7 @@ final class AppModel: ObservableObject {
                         akimboUtterancePause: akimboUtterancePause,
                         bubblesFixedToCharacter: bubblesFixedToCharacter,
                         audioMascots: enabled && singingDemoStartedAt != nil ? [deepSeekSource]
-                            : enabled && (mouthDemoStartedAt != nil || mouthTransitionDemoStartedAt != nil) ? (demoMode && demoCharacterOverride != nil ? [.deepseek] : [.codex, .deepseek])
+                            : enabled && (mouthDemoStartedAt != nil || mouthTransitionDemoStartedAt != nil) ? (isolatedActionPreview ? [demoMascot] : [.codex, .deepseek])
                             : enabled && audioEnabled && audioRunning ? audioSources : [],
                         restingMascots: restingMascots,
                         characterBindings: effectiveCharacterBindings,
@@ -2097,7 +2123,7 @@ final class AppModel: ObservableObject {
                             $0.value == .deepseekCutout
                         }.map { binding in
                             (binding.key, binding.key == .companion ? companionHairstyle
-                                : cutoutHair(for: SessionSource.allCases.first { source in source.preferenceID == binding.key.rawValue }!))
+                                : SessionSource.allCases.first { source in source.preferenceID == binding.key.rawValue }.map { cutoutHair(for: $0) } ?? companionHairstyle)
                         }))
         let visible = overlays.visibleIDs.contains(focusedID)
         let overlay = overlays.controller(for: focusedID)
@@ -2346,7 +2372,7 @@ final class AppModel: ObservableObject {
                 let frame = MouthTransitionDemo.frame(elapsed: elapsed, startedAt: start)
                 lastLipFrame = frame
                 let pose = posePlayer.sample(frame, at: now)
-                overlays.setAudioMouth(pose.rawValue, targets: [.codex, .deepseek])
+                overlays.setAudioMouth(pose.rawValue, targets: isolatedActionPreview ? [demoMascot] : [.codex, .deepseek])
                 lipDeliveredAt = ProcessInfo.processInfo.systemUptime
                 recordLipTimeline(frame, at: lipDeliveredAt!)
                 return
@@ -2408,7 +2434,7 @@ final class AppModel: ObservableObject {
                     let elapsed = now-start
                     sample = DeepSeekSleepTimeline.sample(at: elapsed < 3.2 ? elapsed : 3.2+(elapsed-3.2).truncatingRemainder(dividingBy:3.84))
                 }
-            } else { sample = DeepSeekSleepTimeline.sample(at: now-start) }
+            } else { sample = DeepSeekSleepTimeline.sample(at: now-start, continuous: continuousSleepPreview) }
             if enabled, let sample {
                 overlays.setAudioMouth(nil, targets: [])
                 overlays.setDeepSeekPerformance(nil)
@@ -2490,7 +2516,7 @@ final class AppModel: ObservableObject {
             overlays.setAudioMouth(nil, targets: []); redraw()
         }
         if let preview = argument("--mouth-preview").flatMap(Int.init), (0..<MascotAnimation.mouthCount).contains(preview) {
-            overlays.setAudioMouth(preview, targets: [.codex, .deepseek]); return
+            overlays.setAudioMouth(preview, targets: isolatedActionPreview ? [demoMascot] : [.codex, .deepseek]); return
         }
         if let start = mouthDemoStartedAt {
             let frame = audioRunning ? audio.snapshot() : .silence
@@ -2501,7 +2527,7 @@ final class AppModel: ObservableObject {
                 mouthDemoIndex = index
                 let label = "素材预览 · \(pose.title)"
                 if audioMouthLabel != label { audioMouthLabel = label }
-                overlays.setAudioMouth(index, targets: [.codex, .deepseek])
+                overlays.setAudioMouth(index, targets: isolatedActionPreview ? [demoMascot] : [.codex, .deepseek])
                 return
             }
             mouthDemoStartedAt = nil; mouthDemoIndex = nil

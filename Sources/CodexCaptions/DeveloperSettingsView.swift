@@ -53,7 +53,7 @@ struct DeveloperSettingsView: View {
             Picker("预览角色", selection:$model.developerPreviewCharacter) {
                 ForEach(model.availableCharacters) { character in Text(character.title).tag(character) }
             }.accessibilityIdentifier("developer-preview-character")
-            Text("动作仅使用所选角色；灰色动作尚未为该角色制作。")
+            Text("仅预览所选角色，其他角色照常显示；灰色动作尚未制作。")
                 .font(.caption).foregroundStyle(.secondary)
             LazyVGrid(columns:[GridItem(.flexible()),GridItem(.flexible())],alignment:.leading,spacing:8) {
                 ForEach(DeveloperPreviewAction.allCases) { action in
