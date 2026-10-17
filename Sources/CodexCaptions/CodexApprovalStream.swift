@@ -78,7 +78,7 @@ final class CodexApprovalStream {
                     guard size > 0, size <= 256 * 1024 * 1024 else { throw QuestionReplyError.protocolChanged }
                     if size > 16 * 1024 * 1024 {
                         // Large initial snapshots contain image/tool history.
-                        // Scan the frame in chunks, retaining only pending requests.
+                        // Scan in chunks, retaining requests and bounded file-change details.
                         let prefix = Data(buffer.dropFirst(4)); buffer.removeAll(keepingCapacity: false)
                         var offset = 0
                         socket.deadline = ProcessInfo.processInfo.systemUptime + 30

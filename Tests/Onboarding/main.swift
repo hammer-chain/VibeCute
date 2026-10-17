@@ -274,8 +274,8 @@ precondition(OnboardingHarnessDiscovery.discover(roots: roots).available == [.cl
 writeHeader(["type":"session_meta","payload":["id":"codex-fixture","cwd":"/fixture"]], at:codexRoot.appendingPathComponent("rollout-valid.jsonl"))
 writeHeader(["type":"session","version":4,"delegationDepth":0,"id":"deepseek-fixture","cwd":"/fixture"], at:deepseekRoot.appendingPathComponent("session.v4.jsonl"))
 precondition(OnboardingHarnessDiscovery.discover(roots: roots).available == [.codex,.claude,.deepseek])
-let compressor = Process(); compressor.executableURL = URL(fileURLWithPath:"/opt/homebrew/bin/zstd")
-compressor.arguments = ["-q","-f",deepseekRoot.appendingPathComponent("session.v4.jsonl").path,"-o",deepseekRoot.appendingPathComponent("session.v4.jsonl.zstd").path]
+let compressor = Process(); compressor.executableURL = URL(fileURLWithPath:"/usr/bin/env")
+compressor.arguments = [ProcessInfo.processInfo.environment["CAPTIONS_ZSTD_EXECUTABLE"] ?? "zstd","-q","-f",deepseekRoot.appendingPathComponent("session.v4.jsonl").path,"-o",deepseekRoot.appendingPathComponent("session.v4.jsonl.zstd").path]
 try! compressor.run(); compressor.waitUntilExit(); precondition(compressor.terminationStatus == 0)
 try! FileManager.default.removeItem(at:deepseekRoot.appendingPathComponent("session.v4.jsonl"))
 precondition(OnboardingHarnessDiscovery.discover(roots:[.deepseek:deepseekRoot]).available == [.deepseek])

@@ -63,11 +63,21 @@ final class RealtimeAudio {
     private var sampleRate: Double = 0
     private var timer: DispatchSourceTimer?
     private var wanted = false
+    private var connected = false // control queue only
+    private var retryAt: TimeInterval = 0
+    private var retryDelay: TimeInterval = 2
+    // Allows deterministic lifecycle checks without touching system devices/permissions.
+    struct CaptureHooks {
+        var start: () throws -> Void
+        var stop: () -> Void
+        var needsReconnect: () throws -> Bool
+    }
+    private let captureHooks: CaptureHooks?
 
-    init(speech: KeywordSpeech = KeywordSpeech(), classifierFactory: @escaping (Double, Double) -> SoundContextClassifier = {
+    init(speech: KeywordSpeech = KeywordSpeech(), captureHooks: CaptureHooks? = nil, classifierFactory: @escaping (Double, Double) -> SoundContextClassifier = {
         SoundContextClassifier(sampleRate: $0, audioTimeOrigin: $1)
     }) {
-        self.speech = speech; makeClassifier = classifierFactory
+        self.speech = speech; self.captureHooks = captureHooks; makeClassifier = classifierFactory
     }
 
     func setSensitivity(_ value: Double) {
@@ -169,12 +179,40 @@ final class RealtimeAudio {
         control.async { [weak self] in
             guard let self, self.wanted != enabled else { return }
             self.wanted = enabled
+            self.timer?.cancel(); self.timer = nil
             self.tearDown()
+            self.retryAt = 0; self.retryDelay = 2
             guard enabled else { self.report("系统声音口型已关闭", running: false); return }
             guard #available(macOS 14.2, *) else {
                 self.report("系统声音口型需要 macOS 14.2 或更新版本", running: false); return
             }
+            let timer = DispatchSource.makeTimerSource(queue: self.control)
+            timer.schedule(deadline: .now() + 2, repeating: 2, leeway: .milliseconds(100))
+            timer.setEventHandler { [weak self] in self?.monitorConnection() }
+            self.timer = timer; timer.resume()
             self.begin()
+        }
+    }
+
+    @available(macOS 14.2, *)
+    private func monitorConnection() {
+        guard wanted else { return }
+        if connected {
+            let changed: Bool
+            if let captureHooks { changed = (try? captureHooks.needsReconnect()) ?? true }
+            else {
+                let current = try? defaultOutput()
+                let format: AudioStreamBasicDescription? = try? read(tap, kAudioTapPropertyFormat)
+                changed = current != output || format?.mSampleRate != sampleRate
+            }
+            if changed { tearDown(); retryAt = 0; retryDelay = 2 }
+        }
+        if !connected, ProcessInfo.processInfo.systemUptime >= retryAt { begin() }
+        io.async { [weak self] in
+            guard let self, let last = self.lastPCMReceivedAt,
+                  ProcessInfo.processInfo.systemUptime - last > 1 else { return }
+            self.recognitionActivity = AudioRecognitionActivity()
+            self.updateRecognitionActivity(false)
         }
     }
 
@@ -182,29 +220,15 @@ final class RealtimeAudio {
     private func begin() {
         report("正在连接系统声音… 首次使用请允许系统录音", running: false)
         do {
-            try createTap()
+            if let captureHooks { try captureHooks.start() } else { try createTap() }
+            connected = true; retryAt = 0; retryDelay = 2
             report("已连接系统声音 · 实时近似口型", running: true)
-            let timer = DispatchSource.makeTimerSource(queue: control)
-            timer.schedule(deadline: .now() + 2, repeating: 2)
-            timer.setEventHandler { [weak self] in
-                guard let self, self.wanted else { return }
-                // Reconnect for headphones/output switches and sample-rate changes.
-                let current = try? self.defaultOutput()
-                let format: AudioStreamBasicDescription? = try? self.read(self.tap, kAudioTapPropertyFormat)
-                if current != self.output || format?.mSampleRate != self.sampleRate {
-                    self.tearDown(); self.begin()
-                }
-                self.io.async { [weak self] in
-                    guard let self, let last = self.lastPCMReceivedAt,
-                          ProcessInfo.processInfo.systemUptime - last > 1 else { return }
-                    self.recognitionActivity = AudioRecognitionActivity()
-                    self.updateRecognitionActivity(false)
-                }
-            }
-            self.timer = timer; timer.resume()
         } catch {
             tearDown()
-            report("无法连接系统声音：\(error.localizedDescription)。请检查系统录音权限后关闭再开启。", running: false)
+            let delay = retryDelay
+            retryAt = ProcessInfo.processInfo.systemUptime + delay
+            retryDelay = min(30, delay * 2)
+            report("无法连接系统声音：\(error.localizedDescription)。将在约 \(Int(delay)) 秒后自动重试，请检查设备和系统录音权限。", running: false)
         }
     }
 
@@ -360,7 +384,8 @@ final class RealtimeAudio {
 
     private func tearDown() {
         lock.lock(); captureGeneration += 1; lock.unlock()
-        timer?.cancel(); timer = nil
+        connected = false
+        captureHooks?.stop()
         if let proc {
             AudioDeviceStop(aggregate, proc)
             AudioDeviceDestroyIOProcID(aggregate, proc)
@@ -381,7 +406,7 @@ final class RealtimeAudio {
         lock.lock(); mailbox = LiveLipMailbox(); lock.unlock()
     }
 
-    func shutdown() { control.sync { wanted = false; tearDown() } }
+    func shutdown() { control.sync { wanted = false; timer?.cancel(); timer = nil; tearDown() } }
 
     private func report(_ message: String, running: Bool) {
         DispatchQueue.main.async { [weak self] in self?.onStatus?(message, running) }

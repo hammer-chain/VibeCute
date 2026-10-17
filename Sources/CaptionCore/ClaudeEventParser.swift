@@ -61,8 +61,9 @@ public final class ClaudeEventParser {
                     let label = result["is_error"] as? Bool == true ? "调用失败：" : "调用完成："
                     events.append(.caption(Caption(text: label + name, kind: .tool, date: date)))
                 }
-            } else if let text = message["content"] as? String,
-                      text.hasPrefix("[Request interrupted by user") {
+            } else if (message["content"] as? String).map({ $0.hasPrefix("[Request interrupted by user") }) == true
+                        || blocks.contains(where: { $0["type"] as? String == "text"
+                            && ($0["text"] as? String)?.hasPrefix("[Request interrupted by user") == true }) {
                 inTurn = false; tools.removeAll(); events.append(.finished(date, outcome: .interrupted))
             } else if message["content"] is String || blocks.contains(where: { $0["type"] as? String == "text" }) {
                 inTurn = true; tools.removeAll(); events.append(.started(date))

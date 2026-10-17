@@ -48,6 +48,17 @@ enum ClaudeChecks {
         apply(try row("user", ["message": ["content": "新一轮"]]))
         apply(try row("user", ["message": ["content": "[Request interrupted by user]妥善停止"]]))
         precondition(session.outcome == .interrupted && !session.active)
+        let interruptedContents: [Any] = [
+            [["type":"text", "text":"[Request interrupted by user]"]],
+            [["type":"text", "text":"[Request interrupted by user for tool use]"]],
+            [["type":"image", "source":"PRIVATE"], ["type":"text", "text":"[Request interrupted by user]"]]
+        ]
+        for content in interruptedContents {
+            apply(try row("user", ["message":["content":"new request"]]))
+            apply(try row("assistant", ["message":["stop_reason":"end_turn", "content":[["type":"text","text":"saved answer"]]]]))
+            apply(try row("user", ["message":["content":content]]))
+            precondition(!session.active && session.outcome == .interrupted && session.answer?.text == "saved answer")
+        }
         precondition(parser.parse(Data("{broken".utf8)).isEmpty)
         print("PASS: Claude transcript allowlist, lifecycle, tools, deduplication, reset, titles and answer toggle")
     }

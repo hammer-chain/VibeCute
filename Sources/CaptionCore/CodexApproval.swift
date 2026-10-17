@@ -159,8 +159,8 @@ public struct CodexApproval: Equatable, Sendable {
             visited += 1; guard visited <= 50_000 else { return nil }
             if let rows = value as? [Any] { for row in rows { if let result = visit(row) { return result } }; return nil }
             guard let row = value as? [String: Any] else { return nil }
-            if row["type"] as? String == "fileChange", row["id"] as? String == id { return row }
             if let currentTurn = row["turnId"] as? String, currentTurn != turnID { return nil }
+            if row["type"] as? String == "fileChange", row["id"] as? String == id { return row }
             for key in ["turns", "turnHistory", "history", "entitiesByKey", "items", "data"] {
                 if let value = row[key] {
                     if key == "entitiesByKey", let entities = value as? [String: Any] {
