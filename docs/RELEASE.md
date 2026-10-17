@@ -68,3 +68,20 @@ Release core 检查直接链接最终 Release 的 core 对象，检查 BeatNet �
 ## 随包授权文件
 
 两个配置的 `legal_documents` 固定项目 GPL v3、角色授权说明、CC BY-NC-SA 4.0 完整法律文本和带上游链接的第三方声明。构建时汇入 App 的 `Contents/Resources/Licenses/`，并收集随包依赖许可。DMG 根目录另放一份 `Licenses/`，无需安装即可阅读。验收逐字节比较项目原文、依赖原文和挂载后两份副本，缺文件或内容过期会使打包失败。该修改只增加静态文件和构建时校验，无新增 App 轮询或运行时网络请求。
+
+## 无 Git 的源码包与签名恢复
+
+从 GitHub Download ZIP 解压的目录也可构建。组装器只认源码根目录自身的 Git 仓库，不借用外层仓库。自带 `SOURCE-INFO.json` 的源码导出保留原始提交、版本和源码摘要；若修改过源码，manifest 标记与归档不一致。GitHub ZIP 没有这份元信息时，应用版本仍来自 Info.plist，提交与 dirty 状态记录为未知，不伪造 HEAD。
+
+签名首次准备会先验证 OpenSSL 的导出能力并生成临时证书；持久钥匙串创建/导入失败会回滚本次新建状态。原有身份不自动替换。若此前中断留下已导入的私钥和公开证书，可运行 `python3 scripts/setup_signing.py --recover` 校验并恢复该身份；若缺少可验证身份，脚本保留原文件并停止，应先完整备份 Signing 目录，再人工恢复或清理半成品。已有 identity.json 的情况继续复用原签名身份。
+
+## 审查问题回归
+
+```sh
+bash scripts/test.sh
+bash scripts/review_checks.sh
+python3 -m unittest discover -s Tests -p test_review_build_tools.py -v
+python3 scripts/onboarding_checks.py --profile release
+```
+
+音频回归使用注入的假设备测试实际重连定时器与退避，不操作真实设备或申请系统权限。真实蓝牙/耳机切换仍需单独验收。压缩夹具通过 PATH 查找 zstd，也可设置 `CAPTIONS_ZSTD_EXECUTABLE` 为指定可执行文件路径，避免依赖 Homebrew 的芯片专用前缀。

@@ -42,3 +42,5 @@ git diff --cached --stat
 ## 授权边界
 
 保留 LICENSE、LICENSE-ASSETS.md 和各第三方原始许可声明。项目原创代码 GPL-3.0-only；角色形象 CC BY-NC-SA 4.0，署名“上善无形 ZipZipPipe”。BeatNet+ 权重仅限非商业使用，开发/实验组件还包含 GPL 代码；代码许可不覆盖角色形象和模型权重，不要将整个源码包或 App 一概标为 GPL 授权。
+
+源码 ZIP 还会生成一份 `SOURCE-INFO.json`，记录版本、导出时提交、工作区状态和实际源码摘要；它也进入导出 manifest。审计报告中的 files 是当前源码文件数，export.files 包含这份生成文件。组装器在没有 .git 时读取该元信息；GitHub Download ZIP 未带元信息也可组装，但提交身份标记为未知。

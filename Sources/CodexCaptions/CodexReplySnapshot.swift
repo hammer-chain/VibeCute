@@ -97,14 +97,15 @@ final class CodexReplySnapshot {
             if key == "conversationState" { return .state }
             return ["type", "revision"].contains(key) ? .raw : nil
         case .state:
-            if approvalsOnly { return ["id", "requests"].contains(key) ? .raw : nil }
             if ["turns", "turnHistory"].contains(key) { return .transcript }
+            if approvalsOnly { return ["id", "requests"].contains(key) ? .raw : nil }
             return ["id", "cwd", "requests", "threadRuntimeStatus", "latestCollaborationMode"].contains(key) ? .raw : nil
         case .transcript:
             if key == "entitiesByKey" { return .entities }
             if ["turns", "turnHistory", "history", "items", "data"].contains(key) { return .transcript }
-            if ["content", "input"].contains(key) { return .content }
-            return ["type", "id", "questions", "status", "changes"].contains(key) ? .raw : nil
+            if ["content", "input"].contains(key) { return approvalsOnly ? nil : .content }
+            if key == "questions", approvalsOnly { return nil }
+            return ["type", "id", "turnId", "questions", "status", "changes"].contains(key) ? .raw : nil
         case .entities: return .transcript
         case .content: return ["type", "text"].contains(key) ? .raw : nil
         }
@@ -135,7 +136,7 @@ final class CodexReplySnapshot {
                 try expect(44)
             }
             if context == .transcript, let type = object["type"] as? String {
-                if !["agentMessage", "userMessage", "steeringUserMessage", "fileChange"].contains(type) {
+                if !(approvalsOnly ? ["fileChange"] : ["agentMessage", "userMessage", "steeringUserMessage", "fileChange"]).contains(type) {
                     return nil
                 }
                 if type != "agentMessage" { object.removeValue(forKey: "questions") }

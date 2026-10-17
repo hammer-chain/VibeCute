@@ -400,8 +400,8 @@ final class CaptionCoreTests {
             let input = root.appendingPathComponent("input")
             try Data(text.utf8).write(to: input)
             let process = Process(), pipe = Pipe()
-            process.executableURL = URL(fileURLWithPath: "/opt/homebrew/bin/zstd")
-            process.arguments = ["-q", "-c", input.path]
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            process.arguments = [ProcessInfo.processInfo.environment["CAPTIONS_ZSTD_EXECUTABLE"] ?? "zstd", "-q", "-c", input.path]
             process.standardOutput = pipe
             try process.run()
             let output = pipe.fileHandleForReading.readDataToEndOfFile()

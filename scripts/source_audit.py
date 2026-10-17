@@ -124,12 +124,24 @@ def main():
     out = ROOT / 'output/open-source-audit'; out.mkdir(parents=True, exist_ok=True)
     if args.export and not findings:
         archive = out / 'VibeCute-source.zip'
+        import plistlib
+        # Generated archive provenance is independent of .git and travels with every export.
+        digest = hashlib.sha256()
+        for path in sorted([ROOT / 'Package.swift', *[p for p in (ROOT / 'Sources').rglob('*') if p.is_file()]]):
+            digest.update(str(path.relative_to(ROOT)).encode() + b'\0')
+            digest.update(hashlib.sha256(path.read_bytes()).digest())
+        info = dict(schema=1, version=plistlib.loads((ROOT / 'Resources/Info.plist').read_bytes())['CFBundleShortVersionString'],
+                    git_commit=git('rev-parse', 'HEAD').decode().strip(),
+                    source_dirty=bool(git('status', '--porcelain')), source_sha256=digest.hexdigest())
+        generated = (json.dumps(info, indent=2) + '\n').encode()
+        entries = [entry for entry in entries if entry['path'] != 'SOURCE-INFO.json']
+        entries.append(dict(path='SOURCE-INFO.json', bytes=len(generated), sha256=hashlib.sha256(generated).hexdigest(), generated=True))
         with zipfile.ZipFile(archive, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=6) as z:
             for entry in entries:
-                path = ROOT / entry['path']; data = path.read_bytes()
+                path = ROOT / entry['path']; data = generated if entry.get('generated') else path.read_bytes()
                 assert hashlib.sha256(data).hexdigest() == entry['sha256'], 'Source changed during export'
                 info = zipfile.ZipInfo('VibeCute/' + entry['path'], (2026, 1, 1, 0, 0, 0))
-                mode = 0o755 if path.stat().st_mode & 0o111 else 0o644
+                mode = 0o755 if not entry.get('generated') and path.stat().st_mode & 0o111 else 0o644
                 info.external_attr = (0o100000 | mode) << 16
                 info.compress_type = zipfile.ZIP_DEFLATED
                 z.writestr(info, data)
@@ -138,7 +150,7 @@ def main():
             assert len(z.infolist()) == len(entries)
             for entry in entries:
                 assert hashlib.sha256(z.read('VibeCute/' + entry['path'])).hexdigest() == entry['sha256']
-        report['export'] = dict(path=str(archive.relative_to(ROOT)), bytes=archive.stat().st_size,
+        report['export'] = dict(path=str(archive.relative_to(ROOT)), files=len(entries), bytes=archive.stat().st_size,
                                 sha256=hashlib.sha256(archive.read_bytes()).hexdigest(),
                                 git_history_included=False, extended_attributes_included=False,
                                 every_file_readback_verified=True)

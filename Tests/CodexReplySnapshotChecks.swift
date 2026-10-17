@@ -1,5 +1,11 @@
 import Foundation
 import Darwin
+#if canImport(CaptionCore)
+import CaptionCore
+#endif
+#if canImport(CodexCaptions)
+@testable import CodexCaptions
+#endif
 
 @main
 enum CodexReplySnapshotChecks {
@@ -20,9 +26,9 @@ enum CodexReplySnapshotChecks {
             print(String(decoding: try JSONSerialization.data(withJSONObject: report, options: .sortedKeys), as: UTF8.self))
             return
         }
-        func project(_ data: Data) throws -> [String: Any] {
+        func project(_ data: Data, approvalsOnly: Bool = false) throws -> [String: Any] {
             var offset = 0
-            let parser = CodexReplySnapshot(length: data.count, read: { count in
+            let parser = CodexReplySnapshot(length: data.count, approvalsOnly: approvalsOnly, read: { count in
                 // The socket reader supplies exactly count bytes. Escapes and
                 // UTF-8 are split by the parser's 64 KiB boundary in the big case.
                 defer { offset += count }
@@ -59,6 +65,26 @@ enum CodexReplySnapshotChecks {
         let huge = Data(("{\"error\":\"" + String(repeating: "x", count: 600_000) + "\"}").utf8)
         do { _ = try project(huge); preconditionFailure("Accepted oversized retained field") }
         catch QuestionReplyError.historyTooLarge {}
+        let fileRequest: [String: Any] = ["id":"approve-file", "method":"item/fileChange/requestApproval",
+            "params":["threadId":"fixture","turnId":"turn-1","itemId":"file-1","reason":"fixture"]]
+        let diff = "@@ -1 +1 @@\n-old\n+new"
+        let item: [String: Any] = ["type":"fileChange", "id":"file-1", "turnId":"turn-1",
+            "changes":[["path":"fixture.txt","kind":["type":"update"],"diff":diff]]]
+        let largeEnvelope: [String: Any] = ["method":"thread-stream-state-changed", "params":["change":["conversationState":[
+            "id":"fixture", "requests":[fileRequest], "turnHistory":["history":["entitiesByKey":["turn-1":["items":[
+                ["type":"agentMessage","id":"huge-answer","content":[["type":"text","text":String(repeating:"x",count:17 * 1024 * 1024)]]], item
+            ]]]]]]]]]
+        let hugeFrame = try JSONSerialization.data(withJSONObject:largeEnvelope,options:.sortedKeys)
+        precondition(hugeFrame.count > 16 * 1024 * 1024)
+        let clock = ProcessInfo.processInfo.systemUptime
+        let projectedLarge = try project(hugeFrame, approvalsOnly:true)
+        let largeState = (((projectedLarge["params"] as! [String:Any])["change"] as! [String:Any])["conversationState"] as! [String:Any])
+        let approval = CodexApproval.parse(threadID:"fixture",row:fileRequest,state:largeState)!
+        precondition(approval.fileDetail != nil && approval.question.questions[0].options.contains("允许本次"))
+        let projectedSize = try JSONSerialization.data(withJSONObject:projectedLarge).count
+        precondition(projectedSize < 4096)
+        precondition(CodexApproval.fileItem(id:"file-1",turnID:"wrong-turn",state:largeState) == nil)
+        print("PASS: >16 MiB approval frame keeps a small pending diff, excludes huge answer and preserves turn scope; seconds=\(ProcessInfo.processInfo.systemUptime-clock)")
         print("PASS: snapshot projection, answered question, arbitrary field order, Unicode/escape boundary, malformed data and retained-field bounds")
     }
 }

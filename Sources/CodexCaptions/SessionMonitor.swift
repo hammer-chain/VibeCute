@@ -236,6 +236,10 @@ final class SessionMonitor {
         var snapshots = SessionSource.allCases.flatMap { source in
             parents.filter { $0.source == source }.map(\.snapshot).sorted { $0.activity > $1.activity }.prefix(16)
         }
+        if let pinned, !snapshots.contains(where: { $0.path == pinned }),
+           let parent = parents.first(where: { $0.snapshot.path == pinned }) {
+            snapshots.append(parent.snapshot)
+        }
         snapshots += visible.0.prefix(1)
         snapshots += openCodeSnapshots.prefix(16)
         if let workBuddy {
@@ -260,6 +264,14 @@ final class SessionMonitor {
             self?.onChange?(snapshots, error)
             if !orderedOutcomes.isEmpty { self?.onOutcomes?(orderedOutcomes) }
         }
+    }
+
+    private func discoveredFiles(_ candidates: [(URL, Date, SessionSource)], limit: Int) -> [(URL, Date, SessionSource)] {
+        var recent = Array(candidates.sorted { $0.1 > $1.1 }.prefix(limit))
+        // Also recover a saved pin on first connection, before records has it.
+        if let pinned, !recent.contains(where: { $0.0.path == pinned }),
+           let older = candidates.first(where: { $0.0.path == pinned }) { recent.append(older) }
+        return recent
     }
 
     private func discover() {
@@ -291,7 +303,7 @@ final class SessionMonitor {
                             }
                         } catch { scanError = true }
                     }
-                    files += candidates.sorted { $0.1 > $1.1 }.prefix(32)
+                    files += discoveredFiles(candidates, limit: 32)
                 } catch { scanError = true }
                 if scanError { scanErrors.append("部分 Claude Code 会话目录无法读取。") }
                 continue
@@ -314,7 +326,7 @@ final class SessionMonitor {
             }
             // Keep a bounded child-status pool, while the UI still lists at
             // most sixteen parent conversations per source.
-            files += candidates.sorted { $0.1 > $1.1 }.prefix(source == .codex ? 80 : 32)
+            files += discoveredFiles(candidates, limit: source == .codex ? 80 : 32)
             if scanError { scanErrors.append("部分 \(source.rawValue) 会话目录无法读取。") }
         }
         var retained = Set(files.map { $0.0.path })

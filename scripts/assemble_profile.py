@@ -8,6 +8,7 @@ import plistlib
 import shutil
 import subprocess
 import sys
+from source_provenance import describe_source, source_digest
 
 root = Path(__file__).resolve().parent.parent
 profile, binary, staging = sys.argv[1:]
@@ -75,12 +76,8 @@ if (resources / 'BeatNet').exists():
 if profile == 'development':
     for name in ['Aubio-LICENSE.txt','BTrack-LICENSE.txt','KissFFT-LICENSE.txt','Libsamplerate-LICENSE.txt']:
         shutil.copy(resources / name, licenses)
-source_digest = hashlib.sha256()
-for source in sorted([root / 'Package.swift', *[p for p in (root / 'Sources').rglob('*') if p.is_file()]]):
-    source_digest.update(str(source.relative_to(root)).encode() + b'\0')
-    source_digest.update(hashlib.sha256(source.read_bytes()).digest())
-manifest = dict(target_arch=os.environ.get('CAPTIONS_TARGET_ARCH'), source_sha256=source_digest.hexdigest(), config=config, config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest(),
-                git_commit=subprocess.check_output(['git','rev-parse','HEAD'], cwd=root, text=True).strip(),
-                source_dirty=bool(subprocess.check_output(['git','status','--porcelain'], cwd=root)),
-                notarized=False)
+digest = source_digest(root)
+manifest = dict(target_arch=os.environ.get('CAPTIONS_TARGET_ARCH'), source_sha256=digest,
+                config=config, config_sha256=hashlib.sha256(config_path.read_bytes()).hexdigest(),
+                **describe_source(root, digest), notarized=False)
 (resources / 'BuildManifest.json').write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n')
