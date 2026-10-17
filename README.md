@@ -91,7 +91,7 @@ VibeCute 的项目代码采用 [GNU General Public License v3.0](LICENSE)（SPDX
 
 ### 角色形象：CC BY-NC-SA 4.0
 
-**形象原作者：上善无形 ZipZipPipe。**
+**形象原作者：[上善无形](https://space.bilibili.com/4456176)、[ZipZipPipe](https://space.bilibili.com/4168597)。**
 
 角色形象及对应美术素材采用 [CC BY-NC-SA 4.0（署名—非商业性使用—相同方式共享）](https://creativecommons.org/licenses/by-nc-sa/4.0/)。使用或分发时须保留署名和许可链接；修改后须标明改动。不得用于商业目的，分发改编作品时须遵循相同方式共享要求。详见 [角色素材授权说明](LICENSE-ASSETS.md)。
 

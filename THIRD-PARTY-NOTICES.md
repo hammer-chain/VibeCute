@@ -1,6 +1,6 @@
 # VibeCute 第三方组件与原项目
 
-项目代码：GNU GPL v3（GPL-3.0-only）。角色形象：CC BY-NC-SA 4.0；原作者：上善无形 ZipZipPipe。各第三方组件保留独立的版权及许可声明。
+项目代码：GNU GPL v3（GPL-3.0-only）。角色形象：CC BY-NC-SA 4.0；原作者：[上善无形](https://space.bilibili.com/4456176)、[ZipZipPipe](https://space.bilibili.com/4168597)。各第三方组件保留独立的版权及许可声明。
 
 | 组件 | 原项目 | 许可或限制 | 说明 |
 | --- | --- | --- | --- |

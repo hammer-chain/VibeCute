@@ -1,6 +1,6 @@
 # 角色形象与美术素材授权
 
-**形象原作者：上善无形 ZipZipPipe。**
+**形象原作者：[上善无形](https://space.bilibili.com/4456176)、[ZipZipPipe](https://space.bilibili.com/4168597)。**
 
 本项目中随附的角色形象及对应美术素材，以 **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International（CC BY-NC-SA 4.0，署名—非商业性使用—相同方式共享 4.0 国际）**许可提供。
 
@@ -17,12 +17,12 @@
 
 ## 使用要求
 
-使用、复制或分发角色素材时，请注明原作者“上善无形 ZipZipPipe”，保留许可链接及已有版权、许可和修改声明；修改素材时须说明所作改动，不得暗示原作者为你的作品背书。
+使用、复制或分发角色素材时，请注明原作者“[上善无形](https://space.bilibili.com/4456176)、[ZipZipPipe](https://space.bilibili.com/4168597)”，保留许可链接及已有版权、许可和修改声明；修改素材时须说明所作改动，不得暗示原作者为你的作品背书。
 
 不得将素材用于商业目的。分发改编作品时，须按 CC BY-NC-SA 4.0 或该许可允许的兼容许可授权，不得附加妨碍他人行使许可权利的限制。具体权利与义务以完整法律文本为准。
 
 署名示例：
 
-> 角色形象原作者：上善无形 ZipZipPipe。角色素材采用 CC BY-NC-SA 4.0（https://creativecommons.org/licenses/by-nc-sa/4.0/）。
+> 角色形象原作者：[上善无形](https://space.bilibili.com/4456176)、[ZipZipPipe](https://space.bilibili.com/4168597)。角色素材采用 CC BY-NC-SA 4.0（https://creativecommons.org/licenses/by-nc-sa/4.0/）。
 
 如有改编，请在署名旁补充实际修改内容。
