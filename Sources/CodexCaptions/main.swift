@@ -164,7 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }
         if window === developerWindow {
-            developerWindow = nil; model.stopPreview(); return
+            developerWindow = nil; model.stopPreview(); model.stopWeatherPreview(); return
         }
         guard window === detachedSettingsWindow else { return }
         detachedSettingsWindow = nil

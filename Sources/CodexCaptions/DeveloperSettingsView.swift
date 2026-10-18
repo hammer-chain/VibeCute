@@ -15,6 +15,20 @@ struct DeveloperSettingsView: View {
                     NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
                 }
                 GroupBox("动作与字幕预览") { actionPreviews }
+                GroupBox("桌面天气预览") {
+                    VStack(alignment: .leading, spacing: 10) {
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]) {
+                            ForEach(DesktopWeatherPreview.allCases) { weather in
+                                Button(weather.rawValue) { model.previewWeather(weather) }
+                                    .accessibilityIdentifier("weather-preview-" + weather.id)
+                            }
+                        }
+                        Button("停止天气预览") { model.stopWeatherPreview() }
+                        Text(model.weatherPreviewStatus).font(.caption).foregroundStyle(.secondary)
+                        Text("预览使用本地效果，无需联网且默认静音；关闭此窗口后恢复原设置。小雨、中雨、大雨、雷雨会触发蓝鱼拿盆避雨；没有位置时在附近往返跑。")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }
                 GroupBox("角色开发") {
                     VStack(alignment: .leading, spacing: 10) {
                         Button("对比 DeepSeek 两版…") { CutoutComparisonController.shared.show() }

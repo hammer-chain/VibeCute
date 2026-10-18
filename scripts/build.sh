@@ -74,6 +74,7 @@ for directory in CutoutCharacters DeepSeekCutout DeepSeekThinking OrangeHoodieTh
     rm -rf "$app/Contents/Resources/$directory"
     cp -R "Sources/CodexCaptions/Resources/$directory" "$app/Contents/Resources/"
 done
+cp Sources/CodexCaptions/Resources/rain.wav "$app/Contents/Resources/"
 cp Sources/CodexCaptions/Resources/LipVowels.json "$app/Contents/Resources/"
 swift scripts/icon.swift "$app/Contents/Resources/AppIcon.icns"
 # Clean only the assembled bundle, preserving source assets and developer metadata.

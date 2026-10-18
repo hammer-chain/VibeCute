@@ -199,6 +199,17 @@ private final class CharacterOverlayGroup {
             character.subtitle.setPerformanceFrame(frame)
         }
     }
+    func applyRainShelter(_ sample: RainShelterSample) {
+        guard relocating, !relocationInterrupted else { return }
+        if character.panel.frame.origin != sample.origin {
+            movingGroup = true; character.panel.setFrameOrigin(sample.origin); movingGroup = false
+        }
+        expectedRelocationOrigin = character.panel.frame.origin
+        lastCharacterFrame = character.panel.frame
+        character.subtitle.setRainShelterPose(sample.frame.map { RainShelterPose(frame:$0,mirrored:sample.mirrored) })
+    }
+    func saveRainShelterPosition() { savePosition(allowRelocation:true) }
+
     func endRelocation() {
         relocating = false; expectedRelocationOrigin = nil
         lastCharacterFrame = character.panel.frame
@@ -399,9 +410,9 @@ private final class CharacterOverlayGroup {
         }
     }
 
-    func savePosition() {
+    func savePosition(allowRelocation: Bool = false) {
         pendingPositionSave?.cancel(); pendingPositionSave = nil
-        guard !character.panel.isManuallyDragging, !relocating, scootOrigin == nil, frontRetreatOrigin == nil, positionLoaded, let area = screenArea else { return }
+        guard !character.panel.isManuallyDragging, (!relocating || allowRelocation), scootOrigin == nil, frontRetreatOrigin == nil, positionLoaded, let area = screenArea else { return }
         positionStore?.save(anchor: NSPoint(x: character.panel.frame.midX, y: character.panel.frame.minY),
                             source: source, in: area)
     }
@@ -972,6 +983,26 @@ final class ProjectOverlays {
     func allowedBackdropOrigins(for source: CaptionMascot, in area: CGRect) -> CGRect {
         groups[groupKey(for:source)]?.allowedOrigins(in:area) ?? .null
     }
+    var rainShelterActors: [(source: CaptionMascot, character: OverlayController)] {
+        var seen = Set<String>()
+        return CaptionMascot.allCases.compactMap { source in
+            let key = groupKey(for:source)
+            guard resolvedBindings[source] == .deepseek, !seen.contains(key),
+                  let group = groups[key], group.character.panel.isVisible else { return nil }
+            seen.insert(key); return (source,group.character)
+        }
+    }
+    func rainShelterAllowedOrigins(for source: CaptionMascot, in area: CGRect) -> CGRect {
+        groups[groupKey(for:source)]?.allowedOrigins(in:area) ?? .null
+    }
+    func applyRainShelter(_ sample: RainShelterSample, for source: CaptionMascot) {
+        groups[groupKey(for:source)]?.applyRainShelter(sample)
+    }
+    func saveRainShelterPosition(for source: CaptionMascot) { groups[groupKey(for:source)]?.saveRainShelterPosition() }
+    func clearRainShelter(for source: CaptionMascot) {
+        groups[groupKey(for:source)]?.character.subtitle.setRainShelterPose(nil)
+    }
+
     func backdropRelocationInterrupted(for source: CaptionMascot) -> Bool {
         groups[groupKey(for:source)]?.relocationInterrupted ?? true
     }
@@ -1059,6 +1090,8 @@ final class ProjectOverlays {
                     "sleepZVisible": c.subtitle.sleepSample?.sleepTick != nil,
                     "scootFrame": c.subtitle.scootSample?.frame ?? -1,
                     "scootPhase": c.subtitle.scootSample?.phase ?? "",
+                    "rainShelterFrame": c.subtitle.rainShelterPose?.frame ?? -1,
+                    "rainShelterMirrored": c.subtitle.rainShelterPose?.mirrored ?? false,
                     "strollFrame": c.subtitle.strollSample?.frame ?? -1,
                     "strollPhase": c.subtitle.strollSample?.phase.rawValue ?? "",
                     "frontRetreatFrame": c.subtitle.frontRetreatSample?.frame ?? -1,

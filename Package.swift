@@ -31,7 +31,7 @@ let package = Package(
         .target(name: "CaptionCore", dependencies: releaseProfile ? ["ZstdBridge", "BeatNetBridge", "CSQLite"] : ["ZstdBridge", "AubioBridge", "BTrackBridge", "BeatNetBridge", "CSQLite"], exclude: releaseProfile ? releaseCoreExcludes : [], swiftSettings: profileSettings),
         .executableTarget(name: "CodexCaptions", dependencies: ["CaptionCore"],
                           exclude: (distributionBuild ? ["Resources"] : []) + (releaseProfile ? releaseAppExcludes : []),
-                          resources: distributionBuild ? [] : [.copy("Resources/DeepSeekThinking"), .copy("Resources/OrangeHoodieThinking"), .copy("Resources/DeepSeekCutout"), .copy("Resources/CutoutCharacters"), .copy("Resources/CodexThinking"), .copy("Resources/LipVowels.json"), .copy("Resources/OpenCodeNavigation")],
+                          resources: distributionBuild ? [] : [.copy("Resources/DeepSeekThinking"), .copy("Resources/OrangeHoodieThinking"), .copy("Resources/DeepSeekCutout"), .copy("Resources/CutoutCharacters"), .copy("Resources/CodexThinking"), .copy("Resources/LipVowels.json"), .copy("Resources/rain.wav"), .copy("Resources/OpenCodeNavigation")],
                           swiftSettings: profileSettings + (distributionBuild ? [.define("CAPTIONS_DISTRIBUTION_BUILD")] : [])),
         .executableTarget(name: "ReleaseCoreChecks", dependencies: ["CaptionCore"], path: "Tests/ReleaseCore"),
         .executableTarget(name: "CaptionCoreChecks", dependencies: ["CaptionCore", "CSQLite"], path: "Tests/CaptionCoreTests"),

@@ -264,7 +264,7 @@ final class SubtitleView: NSView {
     }
     var headPatEligible: Bool {
         mode == .character && showsMascot && screenEdgeDock == nil &&
-        !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && scootSample == nil &&
+        !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && rainShelterPose == nil && scootSample == nil &&
         frontRetreatSample == nil && !hasScootRestPose
     }
     var headPatRegion: NSRect {
@@ -357,12 +357,12 @@ final class SubtitleView: NSView {
     var seatedGazePosition: NSPoint { gaze.position }
     var seatedGazeActive: Bool {
         !headPatActive && showsMascot && mascot?.supportsSeatedGaze == true && mode != .bubble && screenEdgeDock == nil &&
-        !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && scootSample == nil &&
+        !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && rainShelterPose == nil && scootSample == nil &&
         frontRetreatSample == nil && !hasScootRestPose
     }
     var originalThinkingPoseActive: Bool {
         !headPatActive && screenEdgeDock == nil && mascotAnimating && audioMouthIndex == nil && mascot?.thinkingFrames.count == 8 &&
-        !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && scootSample == nil &&
+        !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && rainShelterPose == nil && scootSample == nil &&
         frontRetreatSample == nil && !hasScootRestPose
     }
     private var seatedCharacterRect: NSRect {
@@ -371,7 +371,7 @@ final class SubtitleView: NSView {
     }
 
     private func refreshGazeTracking() {
-        guard !dragReaction.active, sleepSample == nil, mascot?.supportsSeatedGaze == true, mode != .bubble, screenEdgeDock == nil else {
+        guard !dragReaction.active, sleepSample == nil, rainShelterPose == nil, mascot?.supportsSeatedGaze == true, mode != .bubble, screenEdgeDock == nil else {
             gazeTimer?.invalidate(); gazeTimer = nil; gaze = SeatedGaze(); return
         }
         guard gazeTimer == nil else { return }
@@ -558,6 +558,15 @@ final class SubtitleView: NSView {
         refreshSeatedMotion()
         needsDisplay = true
     }
+    private(set) var rainShelterPose: RainShelterPose?
+    func setRainShelterPose(_ pose: RainShelterPose?) {
+        guard mascotKind == .deepseek, !usesPinkBear, rainShelterPose != pose else { return }
+        if pose != nil { cancelHeadPat(); cancelSeatedRecovery() }
+        else if rainShelterPose != nil { recoverThinkingSeat() }
+        rainShelterPose = pose
+        refreshSeatedMotion(); refreshGazeTracking(); needsDisplay = true
+    }
+
     var strollMirrored = false
     private(set) var strollSample: StrollTimeline.Sample?
     private var strollEntryImage: NSImage?
@@ -880,7 +889,7 @@ final class SubtitleView: NSView {
         }
         cutoutRenderer = nil
         #endif
-        if usesPinkBear || kind != .deepseek { strollSample = nil; strollEntryImage = nil; scootSample = nil; frontRetreatSample = nil; frontRetreatEntryImage = nil }
+        if usesPinkBear || kind != .deepseek { rainShelterPose = nil; strollSample = nil; strollEntryImage = nil; scootSample = nil; frontRetreatSample = nil; frontRetreatEntryImage = nil }
         if usesPinkBear { audioMouthIndex = nil; performanceFrameIndex = nil }
         if kind == .orangeHoodie { performanceFrameIndex = nil; dragReaction.reset() }
         refreshGazeTracking()
@@ -891,7 +900,7 @@ final class SubtitleView: NSView {
                 guard let self else { return }
                 if self.screenEdgeDock != nil { self.advanceScreenEdgeFrame(); return }
                 self.sequenceIndex = (self.sequenceIndex + 1) % self.playbackSequence.count
-                if (!self.dragReaction.active && self.sleepSample == nil && !self.headPatActive && self.audioMouthIndex == nil && !self.performanceActive && self.strollSample == nil && self.scootSample == nil && self.frontRetreatSample == nil) { self.needsDisplay = true }
+                if (!self.dragReaction.active && self.sleepSample == nil && !self.headPatActive && self.audioMouthIndex == nil && !self.performanceActive && self.strollSample == nil && self.rainShelterPose == nil && self.scootSample == nil && self.frontRetreatSample == nil) { self.needsDisplay = true }
             }
             animationTimer = timer
             RunLoop.main.add(timer, forMode: .common)
@@ -917,7 +926,7 @@ final class SubtitleView: NSView {
             motionStartAmount = 0; motionTargetAmount = 0
             return
         }
-        let target: CGFloat = audioMouthIndex != nil && !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && scootSample == nil && frontRetreatSample == nil ? 1 : 0
+        let target: CGFloat = audioMouthIndex != nil && !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && rainShelterPose == nil && scootSample == nil && frontRetreatSample == nil ? 1 : 0
         if target != motionTargetAmount {
             motionStartAmount = seatedMotionAmount(at: now)
             motionStartedAt = now; motionTargetAmount = target
@@ -1033,6 +1042,10 @@ final class SubtitleView: NSView {
         NSGraphicsContext.current?.cgContext.concatenate(dragReaction.transform(in: seatedSpriteRect, scale: layoutScale))
         if dragReaction.active, let frame = dragReaction.frameIndex, CharacterDragArtwork.shared.available {
             CharacterDragArtwork.shared.draw(frame:frame,in:seatedSpriteRect)
+            return
+        }
+        if let pose = rainShelterPose {
+            DeepSeekRainArtwork.shared.draw(frame:pose.frame,mirrored:pose.mirrored,in:bounds,scale:layoutScale)
             return
         }
         if let sample = sleepSample {

@@ -19,3 +19,9 @@
 正式版的 Licenses 目录包含 LICENSE、LICENSE-ASSETS.md、CC-BY-NC-SA-4.0.txt、本声明，以及 BeatNetPlus-LICENSE.txt、ggml-LICENSE.txt、PocketFFT-NOTICE.txt、Weights-NOTICE.txt 和 Zstandard-LICENSE.txt。
 
 本表中的“接入说明”和“随附许可”指源码仓库内的说明；原项目列为可直接访问的上游网址。正式版不包含 aubio、BTrack、Kiss FFT 或 libsamplerate；开发版若包含相应组件，也会附带相应原始许可。BeatNet+ 权重仅限非商业使用。
+
+## Desktop weather
+
+The desktop rain renderer and procedural rain audio were adapted from the user-supplied DesktopRain prototype. The 24-second rain loop contains no downloaded recordings or samples.
+
+When the user enables automatic city weather, weather data is provided by [Open-Meteo](https://open-meteo.com/) under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). City search uses Open-Meteo's geocoding service with data from [GeoNames](https://www.geonames.org/). The free API is for non-commercial use; commercial integrations require an appropriate subscription or self-hosted service. See [service terms](https://open-meteo.com/en/terms).

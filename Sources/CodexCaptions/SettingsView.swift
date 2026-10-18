@@ -10,6 +10,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
   case appearance = "字幕外观"
   case sounds = "任务音效"
   case interaction = "角色互动"
+  case rain = "桌面雨"
   case permissions = "权限"
   var id: String { rawValue }
   var icon: String {
@@ -19,6 +20,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
     case .appearance: return "captions.bubble"
     case .sounds: return "speaker.wave.2"
     case .interaction: return "figure.wave"
+    case .rain: return "cloud.rain"
     case .permissions: return "shield"
     }
   }
@@ -43,6 +45,7 @@ struct SettingsView: View {
   var onDeveloperMode: () -> Void = {}
   var onOnboarding: () -> Void = {}
   @State private var page: SettingsPage = .appearance
+  @State private var rainCityQuery = ""
 
   var body: some View {
     HStack(spacing: 0) {
@@ -89,6 +92,7 @@ struct SettingsView: View {
     case .appearance: appearance
     case .sounds: sounds
     case .interaction: interaction
+    case .rain: rain
     case .permissions: permissions
     }
   }
@@ -290,6 +294,57 @@ struct SettingsView: View {
       }
       Toggle("开启蓝色大肥鱼闲置互动", isOn: $model.autoWindowPeekEnabled)
 
+    }
+  }
+
+  private var rain: some View {
+    VStack(alignment: .leading, spacing: 16) {
+      Toggle("开启桌面雨", isOn: $model.desktopRainEnabled)
+      Text(model.rainRenderStatus).font(.caption).foregroundStyle(.secondary)
+      Text("下雨时，蓝色大肥鱼会顶盆跑进前台窗口的遮雨区，放盆坐下；没有合适位置时在附近来回跑。已在无雨处时留在原位。")
+        .font(.caption).foregroundStyle(.secondary)
+      Toggle("跟随城市天气：当前有雨时自动显示", isOn: $model.desktopRainAutomatic)
+      if model.desktopRainAutomatic {
+        if let city = model.desktopRainCity { Text("天气城市：\(city.label)") }
+        HStack {
+          TextField("城市名，例如：北京 / Beijing", text: $rainCityQuery)
+            .textFieldStyle(.roundedBorder).onSubmit { model.searchRainCity(rainCityQuery) }
+          Button("搜索城市") { model.searchRainCity(rainCityQuery) }
+        }
+        ForEach(model.rainCityResults) { city in
+          Button(city.label) { model.selectRainCity(city) }.buttonStyle(.link)
+        }
+        Text(model.rainCitySearchStatus).font(.caption).foregroundStyle(.secondary)
+        Text(model.rainWeatherStatus).font(.caption).foregroundStyle(.secondary)
+        Button("立即检测天气") { model.refreshRainWeather() }
+          .disabled(!model.desktopRainEnabled || model.desktopRainCity == nil)
+        Text("开启后每 15 分钟联网检测一次；只向 Open-Meteo 发送所选城市的坐标。天气是模型估计，可能与窗外有差异；检测失败或数据过期时暂停自动雨效。")
+          .font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: 4) {
+          Link("天气：Open-Meteo", destination: URL(string: "https://open-meteo.com/")!)
+          Text("·")
+          Link("城市：GeoNames", destination: URL(string: "https://www.geonames.org/")!)
+        }.font(.caption)
+      } else {
+        Text("手动模式：开启后持续下雨。").font(.caption).foregroundStyle(.secondary)
+      }
+      Divider()
+      settingSlider("雨滴大小", value: $model.desktopRainSize, range: 0.65...2.3,
+                    valueText: String(format: "%.2f×", model.desktopRainSize))
+      settingSlider("下落速度", value: $model.desktopRainSpeed, range: 0.55...2.2,
+                    valueText: String(format: "%.2f×", model.desktopRainSpeed))
+      settingSlider("风向（负值向左）", value: $model.desktopRainWind, range: -40...40,
+                    valueText: String(format: "%.0f°", model.desktopRainWind))
+      settingSlider("雨滴数量", value: $model.desktopRainQuantity, range: 0.35...3,
+                    valueText: String(format: "%.2f×", model.desktopRainQuantity))
+      Toggle("播放雨声", isOn: $model.desktopRainSound)
+      if model.desktopRainSound {
+        Text(model.rainSoundStatus).font(.caption).foregroundStyle(.secondary)
+        settingSlider("雨声音量", value: $model.desktopRainVolume, range: 0...1,
+                      valueText: "\(Int(model.desktopRainVolume * 100))%")
+      }
+      Text("雨效穿透鼠标，普通窗口会挡雨。关闭后停止动画和雨声。")
+        .font(.caption).foregroundStyle(.secondary)
     }
   }
 

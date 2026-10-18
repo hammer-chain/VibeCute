@@ -21,7 +21,8 @@
     "OpenCodeNavigation"
   ],
   "resource_files": [
-    "LipVowels.json"
+    "LipVowels.json",
+    "rain.wav"
   ],
   "excluded_resources": [
     "DeepSeekThinking/Kira"

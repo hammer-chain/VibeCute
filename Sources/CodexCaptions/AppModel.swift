@@ -3,6 +3,89 @@ import SwiftUI
 import CaptionCore
 
 final class AppModel: ObservableObject {
+    @Published var desktopRainEnabled: Bool { didSet { save("desktopRainEnabled", desktopRainEnabled); configureDesktopRain() } }
+    @Published var desktopRainAutomatic: Bool { didSet { save("desktopRainAutomatic", desktopRainAutomatic); configureDesktopRain() } }
+    @Published var desktopRainSound: Bool { didSet { save("desktopRainSound", desktopRainSound); configureDesktopRain() } }
+    @Published var desktopRainSize: Double { didSet { save("desktopRainSize", desktopRainSize); configureDesktopRain() } }
+    @Published var desktopRainSpeed: Double { didSet { save("desktopRainSpeed", desktopRainSpeed); configureDesktopRain() } }
+    @Published var desktopRainWind: Double { didSet { save("desktopRainWind", desktopRainWind); configureDesktopRain() } }
+    @Published var desktopRainQuantity: Double { didSet { save("desktopRainQuantity", desktopRainQuantity); configureDesktopRain() } }
+    @Published var desktopRainVolume: Double { didSet { save("desktopRainVolume", desktopRainVolume); configureDesktopRain() } }
+    @Published private(set) var desktopRainCity: RainCity?
+    @Published private(set) var rainCityResults: [RainCity] = []
+    @Published private(set) var rainCitySearchStatus = "输入城市名后搜索，再选择匹配的城市。"
+    @Published private(set) var rainWeatherStatus = "选择城市后启用自动天气"
+    @Published private(set) var rainRenderStatus = "桌面雨已关闭"
+    @Published private(set) var rainSoundStatus = "雨声已关闭"
+    @Published private(set) var weatherPreview: DesktopWeatherPreview?
+    var weatherPreviewStatus: String { weatherPreview.map { "正在预览：\($0.rawValue) · 停止后恢复真实天气" } ?? "未预览 · 真实天气照常运行" }
+    func previewWeather(_ preview: DesktopWeatherPreview) {
+        guard BuildProfile.experiments else { return }
+        weatherPreview = preview; updateRainRenderer()
+    }
+    func stopWeatherPreview() { weatherPreview = nil; updateRainRenderer() }
+    private let desktopRain = DesktopRainController()
+    private let rainWeather: RainWeatherMonitor
+    private var rainCitySearch: Task<Void, Never>?
+    private var rainIsWet = false
+    private var rainStarted = false
+    var desktopRainDiagnostics: [String: Any] { desktopRain.diagnostics }
+    var rainWeatherDiagnostics: [String: Any] { rainWeather.diagnostics }
+    var rainShelterDiagnostics: [String: Any] { rainShelter.diagnostics }
+    private lazy var rainShelter = RainShelterCoordinator(overlays:overlays)
+
+    func searchRainCity(_ query: String) {
+        rainCitySearch?.cancel(); rainCityResults = []
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard term.count >= 2 else { rainCitySearchStatus = "请输入至少两个字符"; return }
+        rainCitySearchStatus = "正在搜索…"
+        rainCitySearch = Task { @MainActor [weak self] in
+            do {
+                let results = try await RainWeatherClient.cities(named: term)
+                guard !Task.isCancelled, let self else { return }
+                self.rainCityResults = results
+                self.rainCitySearchStatus = results.isEmpty ? "没有找到城市，可尝试英文名称" : "请选择城市，避免同名地点混淆。"
+                self.rainCitySearch = nil
+            } catch {
+                guard !Task.isCancelled, let self else { return }
+                self.rainCitySearchStatus = "城市搜索失败，请稍后重试"; self.rainCitySearch = nil
+            }
+        }
+    }
+    func selectRainCity(_ city: RainCity) {
+        guard city.valid else { return }
+        desktopRainCity = city
+        preferences.set(try? JSONEncoder().encode(city), forKey: "desktopRainCity")
+        rainCityResults = []; rainCitySearchStatus = "已选择 \(city.label)"
+        configureDesktopRain()
+    }
+    func refreshRainWeather() { rainWeather.refresh(manual: true) }
+    private func configureDesktopRain() {
+        guard rainStarted else { return }
+        rainWeather.configure(city: desktopRainEnabled && desktopRainAutomatic ? desktopRainCity : nil)
+        updateRainRenderer()
+    }
+    private func updateRainRenderer() {
+        if let weatherPreview {
+            desktopRain.configure(active: true, settings: weatherPreview.settings, sound: false, volume: 0)
+            rainRenderStatus = "开发者天气预览：\(weatherPreview.rawValue)"
+            rainSoundStatus = desktopRain.soundStatus
+            return
+        }
+        func bounded(_ value: Double, _ range: ClosedRange<Double>, _ fallback: Double) -> Double {
+            value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : fallback
+        }
+        let settings = RainSettings(size: bounded(desktopRainSize, 0.65...2.3, 1),
+            speed: bounded(desktopRainSpeed, 0.55...2.2, 1),
+            wind: tan(bounded(desktopRainWind, -40...40, 0) * .pi / 180),
+            quantity: bounded(desktopRainQuantity, 0.35...3, 1))
+        let active = desktopRainEnabled && (!desktopRainAutomatic || (desktopRainCity != nil && rainIsWet))
+        desktopRain.configure(active: active, settings: settings, sound: desktopRainSound,
+                              volume: bounded(desktopRainVolume, 0...1, 0.35))
+        if rainSoundStatus != desktopRain.soundStatus { rainSoundStatus = desktopRain.soundStatus }
+        let label = active ? "桌面雨正在显示" : desktopRainEnabled ? "自动模式 · 等待当前有雨" : "桌面雨已关闭"
+        if rainRenderStatus != label { rainRenderStatus = label }
+    }
     @Published var developerModeEnabled: Bool { didSet {
         if BuildProfile.isRelease && developerModeEnabled != false { developerModeEnabled = false; return }
         save("developerModeEnabled", developerModeEnabled)
@@ -190,6 +273,7 @@ final class AppModel: ObservableObject {
         return Set(effectiveCharacterBindings.filter { ($0.value == .deepseek || $0.value == .orangeHoodie) && audioSources.contains($0.key) }.keys)
     }
     private func trackingChanged() {
+        rainShelter.stopAll()
         guard !sourcePath.isEmpty else { return }
         stopWindowPeek(); stopBackdropRelocation(); stopPreview()
         selection = ""; states.removeAll(); sessions = []; taskSounds.stop()
@@ -197,6 +281,7 @@ final class AppModel: ObservableObject {
         receive([], error: nil)
     }
     private func bindingsChanged() {
+        rainShelter.stopAll()
         stopWindowPeek(); stopBackdropRelocation(); stopPreview()
         windowPeekIdle.reset(); backdropObservation.invalidate()
         redraw(); updateMouth()
@@ -536,12 +621,27 @@ final class AppModel: ObservableObject {
     private var lastDiagnostics = ""
 
     private let preferences: UserDefaults
-    init() {
+    init(rainWeather: RainWeatherMonitor = RainWeatherMonitor()) {
+        self.rainWeather = rainWeather
         let suiteIndex = CommandLine.arguments.firstIndex(of: "--preferences-suite")
         let suiteName = suiteIndex.flatMap { $0 + 1 < CommandLine.arguments.count ? CommandLine.arguments[$0 + 1] : nil }
         let defaults = suiteName.flatMap(UserDefaults.init(suiteName:)) ?? UserDefaults.standard
         OnboardingProgress.prepare(defaults)
         preferences = defaults
+        desktopRainEnabled = defaults.bool(forKey: "desktopRainEnabled")
+        desktopRainAutomatic = defaults.object(forKey: "desktopRainAutomatic") as? Bool ?? true
+        desktopRainSound = defaults.bool(forKey: "desktopRainSound")
+        func rainNumber(_ key: String, _ fallback: Double, _ range: ClosedRange<Double>) -> Double {
+            let value = defaults.object(forKey: key) as? Double ?? fallback
+            return value.isFinite ? min(range.upperBound, max(range.lowerBound, value)) : fallback
+        }
+        desktopRainSize = rainNumber("desktopRainSize", 1, 0.65...2.3)
+        desktopRainSpeed = rainNumber("desktopRainSpeed", 1, 0.55...2.2)
+        desktopRainWind = rainNumber("desktopRainWind", 0, -40...40)
+        desktopRainQuantity = rainNumber("desktopRainQuantity", 1, 0.35...3)
+        desktopRainVolume = rainNumber("desktopRainVolume", 0.35, 0...1)
+        let storedRainCity = defaults.data(forKey: "desktopRainCity").flatMap { try? JSONDecoder().decode(RainCity.self, from: $0) }
+        desktopRainCity = storedRainCity?.valid == true ? storedRainCity : nil
         developerModeEnabled = BuildProfile.experiments && defaults.bool(forKey: "developerModeEnabled")
         let previewIndex = CommandLine.arguments.firstIndex(of:"--preview-character")
         let previewArgument = previewIndex.flatMap { $0+1<CommandLine.arguments.count ? CommandLine.arguments[$0+1] : nil }
@@ -663,6 +763,17 @@ final class AppModel: ObservableObject {
     }
 
     func start() {
+        rainStarted = true
+        desktopRain.onSuspension = { [weak self] in self?.rainShelter.stopAll() }
+        desktopRain.onStatus = { [weak self] message in
+            guard self?.weatherPreview == nil else { return }
+            if self?.rainRenderStatus != message { self?.rainRenderStatus = message }
+        }
+        rainWeather.onChange = { [weak self] wet, message in
+            guard let self else { return }
+            self.rainIsWet = wet; self.rainWeatherStatus = message; self.updateRainRenderer()
+        }
+        configureDesktopRain()
         backdropObservation.onIdle = { [weak self] in
             guard let self, self.backdropCheckRequested else { return }
             self.updateBackdropAvoidance()
@@ -784,6 +895,7 @@ final class AppModel: ObservableObject {
         terminationObserver = NotificationCenter.default.addObserver(forName: NSApplication.willTerminateNotification,
             object: nil, queue: nil) { [weak self] _ in
                 self?.audio.speech.setEnabled(false); self?.audio.shutdown(); self?.nowPlaying.stop()
+                self?.rainShelter.stopAll(); self?.rainWeather.configure(city: nil); self?.desktopRain.stop(); self?.rainCitySearch?.cancel()
             }
         configureAudio()
         if !CommandLine.arguments.contains("--no-position-memory") {
@@ -1264,6 +1376,7 @@ final class AppModel: ObservableObject {
     private func updateBackdropAvoidance() {
         let now = ProcessInfo.processInfo.systemUptime
         let source = backdropSource
+        guard !rainShelter.sources.contains(source) else { return }
         let hoodie = effectiveCharacterBindings[source] == .orangeHoodie
         let expectedArtwork = hoodie ? "blue-fish-orange-hoodie" : "deepseek"
         let blocked = !autoAvoidanceEnabled ? "自动避让已关闭" : !enabled ? "角色显示已关闭" :
@@ -1352,7 +1465,7 @@ final class AppModel: ObservableObject {
         backdropObservation.observe(displays:targets) { [weak self] result in
             guard let self, self.autoAvoidanceEnabled, self.enabled,
                   !self.demoMode || CommandLine.arguments.contains("--avoidance-demo") || self.backdropPreviewCheck,
-                  self.sleepDemoStartedAt == nil, self.scootDemoStartedAt == nil, self.strollDemoStartedAt == nil, self.frontRetreatDemoStartedAt == nil,
+                  self.sleepDemoStartedAt == nil, self.scootDemoStartedAt == nil, self.strollDemoStartedAt == nil, self.frontRetreatDemoStartedAt == nil, !self.rainShelter.sources.contains(source),
                   self.singingDemoStartedAt == nil || CommandLine.arguments.contains("--singing-avoidance-demo"), self.mouthDemoStartedAt == nil,
                   !self.windowPeek.isRunning,
                   source == self.backdropSource,
@@ -1388,7 +1501,7 @@ final class AppModel: ObservableObject {
                 guard hypot(current.panel.frame.minX-origin.x,current.panel.frame.minY-origin.y) < 3,
                       self.singingPlayer.phase == .seated || self.singingPlayer.phase == .singing,
                       singing == (!hoodie && self.singingPlayer.phase == .singing && DeepSeekPerformance.shared.singingStepAvailable),
-                      self.sleepDemoStartedAt == nil, self.scootDemoStartedAt == nil, self.strollDemoStartedAt == nil, self.frontRetreatDemoStartedAt == nil, !self.windowPeek.isRunning else {
+                      self.sleepDemoStartedAt == nil, self.scootDemoStartedAt == nil, self.strollDemoStartedAt == nil, self.frontRetreatDemoStartedAt == nil, !self.rainShelter.sources.contains(source), !self.windowPeek.isRunning else {
                     self.backdropTrigger.reset(); return
                 }
                 guard let currentScene = scenes.first(where: { $0.frame == screen.frame }) else { self.backdropTrigger.reset(); return }
@@ -1440,6 +1553,11 @@ final class AppModel: ObservableObject {
     }
 
     private func updateAutomaticWindowPeek() {
+        if desktopRain.shelterSnapshot.raining || !rainShelter.sources.isEmpty {
+            windowPeekIdle.pause(at:ProcessInfo.processInfo.systemUptime)
+            autoWindowPeekLabel = "下雨避雨中 · 暂停自动休息"
+            return
+        }
         let now = ProcessInfo.processInfo.systemUptime
         if automaticSleep {
             let character = overlays.character(for: deepSeekSource)
@@ -2103,6 +2221,7 @@ final class AppModel: ObservableObject {
                 restingMascots.insert(deepSeekSource)
             }
         }
+        if enabled { restingMascots.formUnion(rainShelter.sources) }
         if onboardingActive { items = []; restingMascots.formUnion(effectiveCharacterBindings.keys) }
         overlays.update(enabled ? items : [], font: fontSize, opacity: opacity, bottom: bottom,
                         screenIndex: screenIndex, movable: movable, focusedID: focusedID,
@@ -2134,6 +2253,7 @@ final class AppModel: ObservableObject {
         onOnboardingLayout?()
         if let url = diagnosticsURL {
             let value: [String: Any] = ["visible": visible, "text": currentText, "kind": kind,
+                "desktopRain": desktopRain.diagnostics, "rainWeather": rainWeather.diagnostics, "rainShelter": rainShelter.diagnostics,
                 "title": title,
                 "header": header,
                 "source": selected?.source.rawValue ?? "",
@@ -2363,6 +2483,16 @@ final class AppModel: ObservableObject {
     private func updateMouth() {
         let now = ProcessInfo.processInfo.systemUptime
         overlays.updateDragReactions(at: now)
+        let rainSnapshot = desktopRain.shelterSnapshot
+        if rainSnapshot.raining, !demoMode, enabled {
+            if automaticSleep { wakeAutomaticSleep(at:now) }
+            if automaticWindowPeek, windowPeek.isRunning { stopWindowPeek() }
+            if backdropRelocation.running, activeBackdropArtwork == "deepseek" { stopBackdropRelocation(cooldown:3) }
+        }
+        rainShelter.update(rainSnapshot, enabled:enabled && !onboardingActive && !demoMode &&
+            !windowPeek.isRunning && sleepDemoStartedAt == nil && scootDemoStartedAt == nil &&
+            strollDemoStartedAt == nil && frontRetreatDemoStartedAt == nil && mouthDemoStartedAt == nil &&
+            mouthTransitionDemoStartedAt == nil, at:now)
         // Model lifecycle status must keep updating while character actions
         // temporarily take over mouth rendering.
         if vocalSeparationEnabled {
