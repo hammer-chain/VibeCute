@@ -301,7 +301,7 @@ struct SettingsView: View {
     VStack(alignment: .leading, spacing: 16) {
       Toggle("开启桌面雨", isOn: $model.desktopRainEnabled)
       Text(model.rainRenderStatus).font(.caption).foregroundStyle(.secondary)
-      Text("下雨时，蓝色大肥鱼会顶盆跑进前台窗口的遮雨区，放盆坐下；没有合适位置时在附近来回跑。已在无雨处时留在原位。")
+      Text("下雨时，蓝色大肥鱼会顶盆跑到前台窗口底边内侧，完全进入窗口后放盆坐下；不论起点高低，都寻找底边。没有合适位置时在附近来回跑。")
         .font(.caption).foregroundStyle(.secondary)
       Toggle("跟随城市天气：当前有雨时自动显示", isOn: $model.desktopRainAutomatic)
       if model.desktopRainAutomatic {

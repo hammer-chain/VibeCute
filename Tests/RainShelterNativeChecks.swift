@@ -91,6 +91,21 @@ import CaptionCore
         snapshot.suspended = true
         coordinator.update(snapshot,enabled:true,at:150.1)
         precondition(coordinator.sources.isEmpty && actor.subtitle.rainShelterPose == nil,"Sleep/lock retained actor motion")
+        // Even a dry start already inside the window must descend to its bottom.
+        let highStart = CGPoint(x:roof.minX+30,y:roof.minY+90)
+        actor.panel.setFrameOrigin(highStart)
+        let highBody = DeepSeekRainArtwork.body(in:actor.subtitle.bounds,scale:1).offsetBy(dx:highStart.x,dy:highStart.y)
+        precondition(roof.contains(highBody),"High-start fixture must begin fully inside")
+        snapshot.suspended = false; snapshot.frontWindow = quartz
+        coordinator.update(snapshot,enabled:true,at:160)
+        precondition(actor.subtitle.rainShelterPose?.frame == 0,"Inside-window high start skipped travel to bottom edge")
+        for i in 1...900 { coordinator.update(snapshot,enabled:true,at:160+Double(i)/60) }
+        let highArrival = actor.panel.frame.origin
+        let highArrivalBody = DeepSeekRainArtwork.body(in:actor.subtitle.bounds,scale:1).offsetBy(dx:highArrival.x,dy:highArrival.y)
+        precondition(abs(highArrivalBody.minY-roof.minY-8)<0.1,"High native start did not reach the window bottom")
+        precondition(highArrival.y < highStart.y && roof.contains(highArrivalBody))
+        precondition(actor.subtitle.rainShelterPose == nil && actor.subtitle.originalThinkingPoseActive)
+        coordinator.stopAll()
         overlays.update([],font:14,opacity:1,bottom:24,screenIndex:0,movable:true,focusedID:"",characterBindings:[:])
 
         // Actual AppModel weather path, isolated preferences and empty session roots.

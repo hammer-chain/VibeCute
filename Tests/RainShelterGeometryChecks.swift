@@ -29,8 +29,20 @@ import CoreGraphics
         verifyDry(target(secondaryRoute)!,body:body,window:secondary,wind:0.4)
         let high = CGPoint(x:40,y:window.minY+60)
         let highTarget = target(RainShelterPlanner.route(origin:high,anchor:high,body:body,allowed:area,window:window,wind:0,scale:1))!
-        check(highTarget.y == high.y,"Above-bottom start unnecessarily descended")
+        check(abs(highTarget.y+body.minY-window.minY-8)<0.01,"Above-bottom start did not descend to bottom inside edge")
         check(window.contains(body.offsetBy(dx:highTarget.x,dy:highTarget.y)),"High arrival not completely inside")
+        for scale in [0.7,1.0,1.5] {
+            let scaledBody = CGRect(x:body.minX*scale,y:body.minY*scale,width:body.width*scale,height:body.height*scale)
+            for y in [-300.0,20,250,310,800] { for x in [40.0,1200] {
+                let start = CGPoint(x:x,y:y)
+                let p = target(RainShelterPlanner.route(origin:start,anchor:start,body:scaledBody,allowed:area,window:window,wind:0,scale:scale))!
+                check(abs(p.y+scaledBody.minY-window.minY-8*scale)<0.01,"Start height or scale changed bottom alignment")
+                check(window.contains(scaledBody.offsetBy(dx:p.x,dy:p.y)),"Bottom alignment clipped artwork")
+            }}
+        }
+        let clippedArea = CGRect(x:area.minX,y:window.minY+50,width:area.width,height:area.height)
+        check(target(RainShelterPlanner.route(origin:high,anchor:high,body:body,allowed:clippedArea,window:window,wind:0,scale:1)) == nil,
+              "Off-screen bottom edge silently became a mid-window destination")
         check(target(RainShelterPlanner.route(origin:origin,anchor:origin,body:body,allowed:area,window:CGRect(x:400,y:250,width:420,height:100),wind:0,scale:1)) == nil,"Short window accepted a dry shadow outside its rectangle")
         let fallback = RainShelterPlanner.route(origin:origin,anchor:origin,body:body,allowed:area,window:CGRect(x:500,y:200,width:40,height:300),wind:0,scale:1)
         if case .pace(let lo,let hi,let y) = fallback {

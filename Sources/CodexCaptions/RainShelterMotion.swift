@@ -16,15 +16,14 @@ enum RainShelterPlanner {
         }
         let margin = 8 * scale
         if let window, window.width > 1, window.height > 1, wind.isFinite {
-            // Erode the window by the entire artwork envelope. Clamping to the
-            // resulting origin interval gives the bottom edge when starting
-            // below it, and preserves the current height whenever it fits.
+            // Erode by the whole artwork envelope, then always use the window's
+            // bottom inside edge. If that edge is off-screen, pace locally.
             let loX = max(allowed.minX,window.minX+margin-body.minX)
             let hiX = min(allowed.maxX,window.maxX-margin-body.maxX)
-            let loY = max(allowed.minY,window.minY+margin-body.minY)
+            let bottomY = window.minY+margin-body.minY
             let hiY = min(allowed.maxY,window.maxY-margin-body.maxY)
-            if loX <= hiX && loY <= hiY {
-                return .shelter(CGPoint(x:clamp(origin.x,loX,hiX),y:clamp(origin.y,loY,hiY)))
+            if loX <= hiX && allowed.minY <= bottomY && bottomY <= hiY {
+                return .shelter(CGPoint(x:clamp(origin.x,loX,hiX),y:bottomY))
             }
         }
         let center = clamp(anchor.x,allowed.minX,allowed.maxX)
