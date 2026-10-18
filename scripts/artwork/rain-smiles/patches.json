@@ -1,0 +1,34 @@
+{
+  "reach": {
+    "origin": [
+      260,
+      394
+    ],
+    "size": [
+      34,
+      28
+    ],
+    "sourceFrame": 25,
+    "skinOffset": [
+      0,
+      1,
+      3
+    ]
+  },
+  "lap": {
+    "origin": [
+      219,
+      389
+    ],
+    "size": [
+      31,
+      26
+    ],
+    "sourceFrame": 26,
+    "skinOffset": [
+      1,
+      1,
+      3
+    ]
+  }
+}

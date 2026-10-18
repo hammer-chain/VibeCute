@@ -43,7 +43,9 @@ struct RainShelterSample: Equatable {
 
 /// No timers, IO or window queries. Driven by the app's existing animation clock.
 struct RainShelterMotion {
-    static let entryDuration = 1.6, exitDuration = 2.0, stowDuration = 1.2
+    // Frame 22 places the basin down; go straight to frame 25's reaching pose.
+    // Frames 23/24 sit upright before reaching again and are intentionally skipped.
+    static let entryDuration = 1.6, exitDuration = 1.5, stowDuration = 1.2
     private(set) var origin: CGPoint
     private(set) var phase: RainShelterSample.Phase = .idle
     private var phaseStart: Double
@@ -102,7 +104,7 @@ struct RainShelterMotion {
         case .idle: frame = nil
         case .raising: frame = min(7,Int(max(0,now-phaseStart)/0.2))
         case .running: frame = 8+Int(max(0,now-runStart)/0.1)%8
-        case .lowering: frame = 16+min(7,Int(max(0,now-phaseStart)/0.25))
+        case .lowering: frame = 16+min(5,Int(max(0,now-phaseStart)/0.25))
         case .stowing: frame = 24+min(7,Int(max(0,now-phaseStart)/0.15))
         case .sheltered: frame = nil
         }

@@ -60,15 +60,20 @@ import CoreGraphics
             check(sample.frame == i && sample.origin == origin,"Entry skipped a frame or slid while seated")
         }
         var runFrames = Set<Int>(), lowerFrames = Set<Int>(), stowFrames = Set<Int>()
+        var exitSequence: [Int] = []
         for i in 96...600 {
             sample = motion.update(at:Double(i)/60,raining:true,route:.shelter(destination),scale:1)
             if sample.phase == .running { runFrames.insert(sample.frame!); check((8...15).contains(sample.frame!),"Run leaked an entry/exit frame") }
             if sample.phase == .lowering { lowerFrames.insert(sample.frame!) }
             if sample.phase == .stowing { stowFrames.insert(sample.frame!) }
+            if (sample.phase == .lowering || sample.phase == .stowing), exitSequence.last != sample.frame {
+                exitSequence.append(sample.frame!)
+            }
         }
         check(runFrames == Set(8...15),"Run omitted a key pose")
-        check(lowerFrames == Set(16...23),"Arrival omitted a sit-down transition")
+        check(lowerFrames == Set(16...21),"Arrival must place the basin at frame 22 without sitting upright at 23/24")
         check(stowFrames == Set(24...31),"Arrival omitted a stow frame")
+        check(exitSequence == Array(16...21)+Array(24...31),"Basin placement must proceed directly from frame 22 to 25")
         check(sample.phase == .sheltered && sample.origin == destination && sample.frame == nil,"Arrival did not release artwork to thinking")
         sample = motion.update(at:11,raining:true,route:.shelter(destination),scale:1)
         check(sample.phase == .sheltered,"Same roof restarted entry")
@@ -88,9 +93,9 @@ import CoreGraphics
         check(directions.count == 2,"Fallback never alternated directions")
         sample = pace.update(at:20,raining:false,route:band,scale:1)
         check(sample.phase == .lowering,"Rain stop did not start putting basin down")
-        sample = pace.update(at:22.1,raining:false,route:band,scale:1)
+        sample = pace.update(at:21.6,raining:false,route:band,scale:1)
         check(sample.phase == .stowing,"Rain stop skipped basin stow")
-        sample = pace.update(at:23.3,raining:false,route:band,scale:1)
+        sample = pace.update(at:22.8,raining:false,route:band,scale:1)
         check(sample.phase == .idle,"Rain stop never completed")
         // Warm deterministic planner benchmark: 50k foreground changes, no OS queries.
         var samples: [Double] = [], checksum = 0.0

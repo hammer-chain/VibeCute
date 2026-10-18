@@ -79,6 +79,18 @@ def canonical():
     return result
 
 
+def smile(image, name):
+    # Small imagegen expression edits registered onto the approved pixels.
+    # The rest of the face, eyes, hair, body and basin remain byte-identical.
+    folder = ROOT/'scripts/artwork/rain-smiles'
+    registration = json.loads((folder/'patches.json').read_text())[name]
+    result = image.copy()
+    with Image.open(folder/f'{name}-mouth.png') as patch:
+        result.alpha_composite(patch.convert('RGBA'),tuple(registration['origin']))
+    result.putalpha(image.getchannel('A'))
+    return result
+
+
 def settle(image, sourceY, targetY, xScale, xOffset):
     mesh = []
     for sy0,sy1,ty0,ty1 in zip(sourceY,sourceY[1:],targetY,targetY[1:]):
@@ -107,13 +119,13 @@ def main():
     bare = tone(approved(1, args.source_dir), 1)
     # Reach for the basin, draw it behind the body in four progressively tucked
     # positions, then settle from hands-in-lap to the real thinking artwork.
-    frames.append(register(tone(approved(2,args.source_dir),2), 1.23))
+    frames.append(smile(register(tone(approved(2,args.source_dir),2), 1.23),'reach'))
     for t in [0, 1/3, 2/3, 1.0]:
         layer = Image.new('RGBA', reach.size)
         p = prop.resize((round(110*(1-.3*t)),round(86*(1-.3*t))),Image.Resampling.LANCZOS)
         layer.alpha_composite(p,(round(250-80*t),round(390-30*t)))
         layer.alpha_composite(bare)
-        frames.append(register(layer,1.18))
+        frames.append(smile(register(layer,1.18),'lap'))
     start, end = frames[-1], canonical()
     ys = [0,212,377,410,500,552,608,640]
     ye = [0,204,351,394,474,544,600,640]
@@ -131,12 +143,14 @@ def main():
     report = dict(sourceCommit=APPROVED, size=SIZE, footLine=FOOT,
                   scales=SCALES, hairSaturationFactor=.82, hairValueFactor=.96,
                   stowFrames=8, decodedPixelBytes=len(frames)*512*640*4, files=hashes)
+    report['expressionEdits'] = 'Registered imagegen mouth patches; all other pixels preserved'
+    report['playbackOrder'] = [*range(1,23),*range(25,33)]
     (args.output/'calibration.json').write_text(json.dumps(report,indent=2)+'\n')
     preview = ROOT/'output/rain-shelter/calibration'
     preview.mkdir(parents=True,exist_ok=True)
     sheet = Image.new('RGB',(512*6,680*2),'#253647')
     draw = ImageDraw.Draw(sheet)
-    for cell, i in enumerate([0,23,24,25,26,27,28,29,30,31]):
+    for cell, i in enumerate([0,21,24,25,26,27,28,29,30,31]):
         x,y=cell%6*512,cell//6*680
         sheet.paste(frames[i],(x,y),frames[i]);draw.text((x+20,y+646),str(i+1),fill='white')
     sheet.save(preview/'stow-contact.jpg')
