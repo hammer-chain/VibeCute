@@ -207,6 +207,7 @@ private final class CharacterOverlayGroup {
         expectedRelocationOrigin = character.panel.frame.origin
         lastCharacterFrame = character.panel.frame
         character.subtitle.setRainShelterPose(sample.frame.map { RainShelterPose(frame:$0,mirrored:sample.mirrored) })
+        character.subtitle.setRainShelterThinking(sample.phase == .sheltered)
     }
     func saveRainShelterPosition() { savePosition(allowRelocation:true) }
 
@@ -1001,6 +1002,7 @@ final class ProjectOverlays {
     func saveRainShelterPosition(for source: CaptionMascot) { groups[groupKey(for:source)]?.saveRainShelterPosition() }
     func clearRainShelter(for source: CaptionMascot) {
         groups[groupKey(for:source)]?.character.subtitle.setRainShelterPose(nil)
+        groups[groupKey(for:source)]?.character.subtitle.setRainShelterThinking(false)
     }
 
     func backdropRelocationInterrupted(for source: CaptionMascot) -> Bool {

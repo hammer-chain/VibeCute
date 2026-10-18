@@ -113,8 +113,12 @@ try:
                 assert data['rainShelter']['windowQueries'] == 0
             elif label == 'rain-on-sheltered':
                 assert positions and not any(p['fallback'] for p in positions)
-                assert data['rainShelter']['actors'][0]['phase'] == 'sheltered', 'Signed app never reached real foreground window shadow'
-                assert any(c.get('rainShelterFrame') == 23 for c in data['characters']), 'Arrival omitted native basin put-down pose'
+                assert data['rainShelter']['actors'][0]['phase'] == 'sheltered', 'Signed app never arrived inside real foreground window'
+                assert any(c.get('rainShelterFrame') == -1 and c.get('originalThinkingPoseActive') for c in data['characters']), 'Arrival did not finish stowing basin and resume thinking'
+                roof = fixtures[-1]['appKitFrame']
+                actor = data['rainShelter']['actors'][0]
+                assert actor['x'] >= roof['x']+7.9 and actor['x']+204 <= roof['x']+roof['width']-7.9, 'Full artwork did not fit inside foreground window horizontally'
+                assert abs(actor['y']+2-roof['y']-8) < .2 and actor['y']+214 <= roof['y']+roof['height']-7.9, 'Below-window start did not arrive at bottom inside edge'
             else:
                 assert data['desktopRain']['frames'] == data['desktopRain']['geometryQueries'] == 0
                 assert not data['rainShelter']['actors']

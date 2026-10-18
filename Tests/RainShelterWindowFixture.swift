@@ -12,7 +12,10 @@ import AppKit
         window.title = "VibeCute · 避雨验收"
         window.isReleasedWhenClosed = false
         window.orderFrontRegardless()
-        let report: [String:Any] = ["window":window.windowNumber,"width":width,"content":"test-owned blank fixture; no user window contents"]
+        let f = window.frame
+        let report: [String:Any] = ["window":window.windowNumber,"width":width,
+            "appKitFrame":["x":f.minX,"y":f.minY,"width":f.width,"height":f.height],
+            "content":"test-owned blank fixture; no user window contents"]
         try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted]).write(to:URL(fileURLWithPath:CommandLine.arguments[1]))
         RunLoop.main.run(until:Date().addingTimeInterval(90))
         window.close()

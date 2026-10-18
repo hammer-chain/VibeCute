@@ -73,7 +73,7 @@ final class RainShelterCoordinator {
             }
             let previous = actor.motion.phase
             let sample = actor.motion.update(at:now,raining:snapshot.raining,route:actor.route,scale:scale)
-            if sample.frame != nil {
+            if sample.frame != nil || actor.controlling {
                 if !actor.controlling { overlays.beginBackdropRelocation(for:source); actor.controlling = true }
                 overlays.applyRainShelter(sample,for:source)
                 if sample.phase == .sheltered && previous != .sheltered { overlays.saveRainShelterPosition(for:source) }

@@ -12,7 +12,8 @@ import CaptionCore
         let decodeStart = CACurrentMediaTime()
         precondition(DeepSeekRainArtwork.shared.available)
         let decodeMs = (CACurrentMediaTime()-decodeStart)*1000
-        precondition(DeepSeekRainArtwork.shared.frames.count == 24)
+        precondition(DeepSeekRainArtwork.shared.frames.count == 32)
+        precondition(decodeMs < 250,"Bounded cold artwork decode exceeded 250ms")
         let overlays = ProjectOverlays(positionStore:nil)
         overlays.update([],font:14,opacity:1,bottom:24,screenIndex:0,movable:true,focusedID:"",
             restingMascots:[.companion,.codex],characterBindings:[.companion:.deepseek,.codex:.codex])
@@ -31,19 +32,27 @@ import CaptionCore
             actor.subtitle.cacheDisplay(in:actor.subtitle.bounds,to:bitmap)
             try bitmap.representation(using:.png,properties:[:])!.write(to:URL(fileURLWithPath:"output/rain-shelter/"+name+".png"))
         }
+        var stowKeys = Set<Int>()
         for i in 0...600 {
             let t = 100+Double(i)/60, before = CACurrentMediaTime()
             coordinator.update(snapshot,enabled:true,at:t)
             times.append((CACurrentMediaTime()-before)*1000)
             if i == 20 { precondition(actor.subtitle.rainShelterPose != nil); try render("native-entry") }
             if i == 150 { precondition((8...15).contains(actor.subtitle.rainShelterPose!.frame)); try render("native-running") }
-            if i == 400 { try render("native-sheltered") }
+            if let pose = actor.subtitle.rainShelterPose, pose.frame >= 24 {
+                stowKeys.insert(pose.frame)
+                if pose.frame == 26 { try render("native-stowing") }
+            }
+            if i == 600 { try render("native-sheltered") }
             precondition(other.subtitle.rainShelterPose == nil,"Rain changed another character's artwork")
         }
-        precondition(actor.subtitle.rainShelterPose?.frame == 23,"Did not sit under real native panel target")
+        precondition(stowKeys == Set(24...31),"Native update skipped the basin-stow tail")
+        precondition(actor.subtitle.rainShelterPose == nil && actor.subtitle.originalThinkingPoseActive,"Did not restore actual thinking after stow")
         var arrival = actor.panel.frame.origin
         precondition(arrival.x > start.x+100)
         let body = DeepSeekRainArtwork.body(in:actor.subtitle.bounds,scale:1).offsetBy(dx:arrival.x,dy:arrival.y)
+        precondition(roof.contains(body),"Arrival is below/outside the foreground window")
+        precondition(abs(body.minY-roof.minY-8)<0.1,"Below-window start did not arrive at bottom inside edge")
         let field = RoofField(windows:[quartz])
         for x in [body.minX,body.maxX] { for y in [body.minY,body.maxY] {
             precondition(field.isSheltered(RainPoint(x:x,y:screen.frame.maxY-y),wind:0),"Arrived in a wet pixel")
@@ -53,7 +62,7 @@ import CaptionCore
         snapshot.frontWindow = quartzRect(appKit:RainRect(x:roof.minX+120,y:roof.minY,width:roof.width,height:roof.height),mainDisplayTop:screen.frame.maxY)
         for i in 1...660 { coordinator.update(snapshot,enabled:true,at:110+Double(i)/60) }
         precondition(actor.panel.frame.minX > arrival.x+80,"Moving foreground roof was not followed")
-        precondition(actor.subtitle.rainShelterPose?.frame == 23,"Did not settle after roof moved")
+        precondition(actor.subtitle.rainShelterPose == nil && actor.subtitle.originalThinkingPoseActive,"Did not restore thinking after roof moved")
         arrival = actor.panel.frame.origin
         snapshot.frontWindow = nil
         var directions = Set<Bool>(), minX = Double.infinity, maxX = -Double.infinity
@@ -75,7 +84,7 @@ import CaptionCore
         coordinator.update(snapshot,enabled:true,at:144.2)
         precondition(actor.subtitle.rainShelterPose != nil,"Rain never resumed after manual move")
         snapshot.raining = false
-        for i in 0...150 { coordinator.update(snapshot,enabled:true,at:144.3+Double(i)/60) }
+        for i in 0...210 { coordinator.update(snapshot,enabled:true,at:144.3+Double(i)/60) }
         precondition(coordinator.sources.isEmpty && actor.subtitle.rainShelterPose == nil)
         snapshot.raining = true
         coordinator.update(snapshot,enabled:true,at:150)
@@ -107,7 +116,7 @@ import CaptionCore
         model.desktopRainAutomatic = false; wait(0.2)
         precondition(model.desktopRainDiagnostics["active"] as? Bool == true)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.count == 1,"Real rain did not reach companion blue fish")
-        model.previewWeather(.snow); wait(2.3)
+        model.previewWeather(.snow); wait(3.5)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.isEmpty == true,"Snow triggered rain shelter")
         model.previewWeather(.thunder); wait(0.25)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.count == 1,"Thunder preview did not trigger shelter")
@@ -117,12 +126,12 @@ import CaptionCore
         NSWorkspace.shared.notificationCenter.post(name:NSWorkspace.screensDidWakeNotification,object:nil)
         wait(0.2)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.count == 1,"Wake did not resume rain behavior")
-        model.desktopRainEnabled = false; model.stopWeatherPreview(); wait(2.3)
+        model.desktopRainEnabled = false; model.stopWeatherPreview(); wait(3.5)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.isEmpty == true)
         precondition(model.desktopRainDiagnostics["active"] as? Bool == false)
         precondition(weatherCalls == 2,"Shelter added a weather request")
         times.sort()
-        let report: [String:Any] = ["coldDecodeMs":decodeMs,"decodedFrames":24,"decodedPixelBytes":24*384*512*4,
+        let report: [String:Any] = ["coldDecodeMs":decodeMs,"decodedFrames":32,"decodedPixelBytes":32*512*640*4,"stowKeys":stowKeys.sorted(),
             "coordinatorSampleCalls":times.count,"p95UpdateMs":times[Int(Double(times.count-1)*0.95)],
             "planningCallsFor10Seconds":plansAfterArrival,"extraWindowQueries":0,"extraWeatherRequests":0,
             "arrivalX":arrival.x,"fallbackSpan":maxX-minX,"fallbackDirections":directions.count,

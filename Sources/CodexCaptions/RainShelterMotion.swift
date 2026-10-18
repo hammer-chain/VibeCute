@@ -1,7 +1,7 @@
 import Foundation
 
-/// AppKit coordinates throughout. A roof's rain shadow is the same backwards
-/// ray used by RoofField, including wind beyond the window's lower edge.
+/// AppKit coordinates throughout. Destinations must fit inside the foreground
+/// window itself; its rain shadow below the bottom edge is not a destination.
 enum RainShelterRoute: Equatable {
     case shelter(CGPoint)
     case pace(minX: Double, maxX: Double, y: Double)
@@ -16,29 +16,16 @@ enum RainShelterPlanner {
         }
         let margin = 8 * scale
         if let window, window.width > 1, window.height > 1, wind.isFinite {
-            // Constant-size search, not a desktop pixel or all-window scan.
-            let ys = [origin.y, window.maxY-body.maxY-margin, window.midY-body.midY]
-            var best: (point: CGPoint, distance: Double)?
-            for rawY in ys {
-                let y = clamp(rawY, allowed.minY, allowed.maxY)
-                // Ray intersection spans at the top and bottom of the body.
-                // A rectangle's extruded shadow is convex; four corners suffice.
-                func span(at height: Double) -> (Double, Double)? {
-                    let drop = window.maxY-height
-                    guard drop >= 0 else { return nil }
-                    let near = max(0, drop-window.height), far = drop
-                    return (window.minX+min(wind*near,wind*far),
-                            window.maxX+max(wind*near,wind*far))
-                }
-                guard let top = span(at:y+body.maxY), let bottom = span(at:y+body.minY) else { continue }
-                let lo = max(allowed.minX, max(top.0,bottom.0)+margin-body.minX)
-                let hi = min(allowed.maxX, min(top.1,bottom.1)-margin-body.maxX)
-                guard lo <= hi else { continue }
-                let p = CGPoint(x:clamp(origin.x,lo,hi),y:y)
-                let distance = hypot(p.x-origin.x,p.y-origin.y)
-                if best == nil || distance < best!.distance { best = (p,distance) }
+            // Erode the window by the entire artwork envelope. Clamping to the
+            // resulting origin interval gives the bottom edge when starting
+            // below it, and preserves the current height whenever it fits.
+            let loX = max(allowed.minX,window.minX+margin-body.minX)
+            let hiX = min(allowed.maxX,window.maxX-margin-body.maxX)
+            let loY = max(allowed.minY,window.minY+margin-body.minY)
+            let hiY = min(allowed.maxY,window.maxY-margin-body.maxY)
+            if loX <= hiX && loY <= hiY {
+                return .shelter(CGPoint(x:clamp(origin.x,loX,hiX),y:clamp(origin.y,loY,hiY)))
             }
-            if let best { return .shelter(best.point) }
         }
         let center = clamp(anchor.x,allowed.minX,allowed.maxX)
         return .pace(minX:max(allowed.minX,center-56*scale),
@@ -48,7 +35,7 @@ enum RainShelterPlanner {
 }
 
 struct RainShelterSample: Equatable {
-    enum Phase: String { case idle, raising, running, lowering, sheltered }
+    enum Phase: String { case idle, raising, running, lowering, stowing, sheltered }
     var origin: CGPoint
     var frame: Int?
     var mirrored: Bool
@@ -57,7 +44,7 @@ struct RainShelterSample: Equatable {
 
 /// No timers, IO or window queries. Driven by the app's existing animation clock.
 struct RainShelterMotion {
-    static let entryDuration = 1.6, exitDuration = 2.0
+    static let entryDuration = 1.6, exitDuration = 2.0, stowDuration = 1.2
     private(set) var origin: CGPoint
     private(set) var phase: RainShelterSample.Phase = .idle
     private var phaseStart: Double
@@ -65,7 +52,6 @@ struct RainShelterMotion {
     private var runStart: Double
     private var mirrored = false
     private var headingRight = true
-    private var hasBasin = false
     init(origin: CGPoint, at now: Double) {
         self.origin = origin
         phaseStart = now; lastTime = now; runStart = now
@@ -84,9 +70,9 @@ struct RainShelterMotion {
         }
         if !raining {
             if phase == .raising || phase == .running { phase = .lowering; phaseStart = now }
-            else if phase == .sheltered { phase = .idle; hasBasin = false }
+            else if phase == .sheltered { phase = .idle }
         } else if phase == .idle || phase == .sheltered {
-            if needsTravel() { phase = .raising; phaseStart = now; hasBasin = true }
+            if needsTravel() { phase = .raising; phaseStart = now }
             else { phase = .sheltered }
         }
         if phase == .raising, now-phaseStart >= Self.entryDuration {
@@ -107,8 +93,10 @@ struct RainShelterMotion {
             }
         }
         if phase == .lowering, now-phaseStart >= Self.exitDuration {
+            phase = .stowing; phaseStart += Self.exitDuration
+        }
+        if phase == .stowing, now-phaseStart >= Self.stowDuration {
             phase = raining ? .sheltered : .idle
-            if !raining { hasBasin = false }
         }
         let frame: Int?
         switch phase {
@@ -116,7 +104,8 @@ struct RainShelterMotion {
         case .raising: frame = min(7,Int(max(0,now-phaseStart)/0.2))
         case .running: frame = 8+Int(max(0,now-runStart)/0.1)%8
         case .lowering: frame = 16+min(7,Int(max(0,now-phaseStart)/0.25))
-        case .sheltered: frame = hasBasin ? 23 : nil
+        case .stowing: frame = 24+min(7,Int(max(0,now-phaseStart)/0.15))
+        case .sheltered: frame = nil
         }
         return RainShelterSample(origin:origin,frame:frame,
             mirrored:mirrored && (phase == .running || (phase == .lowering && (frame ?? 24)<18)),phase:phase)

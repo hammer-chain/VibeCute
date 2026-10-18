@@ -220,6 +220,8 @@ final class SubtitleView: NSView {
         screenEdgeDock != nil ? ScreenEdgeArtwork.sequence : mascot?.playbackSequence ?? MascotAnimation.sequence
     }
     private var animationTimer: Timer?
+    private var requestedMascotAnimating = false
+    private var rainShelterThinking = false
     private var seatedMotionTimer: Timer?
     private var gazeTimer: Timer?
     private var gazeClock: TimeInterval = 0
@@ -559,10 +561,19 @@ final class SubtitleView: NSView {
         needsDisplay = true
     }
     private(set) var rainShelterPose: RainShelterPose?
+    func setRainShelterThinking(_ enabled: Bool) {
+        guard rainShelterThinking != enabled else { return }
+        rainShelterThinking = enabled
+        refreshMascotAnimation(); refreshGazeTracking(); needsDisplay = true
+    }
     func setRainShelterPose(_ pose: RainShelterPose?) {
         guard mascotKind == .deepseek, !usesPinkBear, rainShelterPose != pose else { return }
         if pose != nil { cancelHeadPat(); cancelSeatedRecovery() }
-        else if rainShelterPose != nil { recoverThinkingSeat() }
+        else if rainShelterPose != nil {
+            // The last stow image already matches thinking frame zero. A second
+            // scoot-rest recovery would briefly replace it with another pose.
+            cancelSeatedRecovery(); sequenceIndex = 0
+        }
         rainShelterPose = pose
         refreshSeatedMotion(); refreshGazeTracking(); needsDisplay = true
     }
@@ -803,7 +814,10 @@ final class SubtitleView: NSView {
     #if !VIBECUTE_RELEASE
         if mode == .character,let renderer=cutoutRenderer {return renderer.displaySize.width*layoutScale}
     #endif
-        if mode == .character { return (performanceHeadroom > 0 ? 147 : 126) * layoutScale }
+        if mode == .character {
+            if mascotKind == .deepseek && !usesPinkBear { return 204 * layoutScale }
+            return (performanceHeadroom > 0 ? 147 : 126) * layoutScale
+        }
         let key = TextMeasureKey(text: text, fontSize: fontSize, scale: layoutScale, width: 0)
         let natural: CGFloat
         if let cached = naturalMeasurement, cached.0 == key {
@@ -866,6 +880,7 @@ final class SubtitleView: NSView {
     }
 
     func setMascot(_ kind: CaptionMascot?, animating: Bool, pinkBear: Bool = false) {
+        requestedMascotAnimating = animating
         if kind != mascotKind || pinkBear != usesPinkBear || mode != .character { cancelHeadPat() }
         if kind != mascotKind || pinkBear != usesPinkBear { sequenceIndex = 0; cancelSeatedRecovery() }
         if kind != mascotKind || pinkBear != usesPinkBear {
@@ -889,12 +904,16 @@ final class SubtitleView: NSView {
         }
         cutoutRenderer = nil
         #endif
-        if usesPinkBear || kind != .deepseek { rainShelterPose = nil; strollSample = nil; strollEntryImage = nil; scootSample = nil; frontRetreatSample = nil; frontRetreatEntryImage = nil }
+        if usesPinkBear || kind != .deepseek { rainShelterThinking = false; rainShelterPose = nil; strollSample = nil; strollEntryImage = nil; scootSample = nil; frontRetreatSample = nil; frontRetreatEntryImage = nil }
         if usesPinkBear { audioMouthIndex = nil; performanceFrameIndex = nil }
         if kind == .orangeHoodie { performanceFrameIndex = nil; dragReaction.reset() }
         refreshGazeTracking()
         refreshSeatedMotion()
-        if showsMascot && (animating || screenEdgeDock != nil) {
+        refreshMascotAnimation()
+    }
+
+    private func refreshMascotAnimation() {
+        if showsMascot && (requestedMascotAnimating || rainShelterThinking || screenEdgeDock != nil) {
             guard animationTimer == nil else { return }
             let timer = Timer(timeInterval: 0.16, repeats: true) { [weak self] _ in
                 guard let self else { return }
