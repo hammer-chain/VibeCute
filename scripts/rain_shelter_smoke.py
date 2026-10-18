@@ -1,18 +1,29 @@
 #!/usr/bin/env python3
 """Measure the signed app with one fixed, test-owned foreground window and isolated preferences."""
+import argparse
 import json
 from pathlib import Path
+import platform
 import plistlib
 import subprocess
 import time
 import uuid
 
 ROOT = Path(__file__).resolve().parent.parent
-OUT = ROOT / 'output/rain-shelter'
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--profile',choices=['development','release'],default='development')
+parser.add_argument('--arch',choices=['arm64','x86_64'])
+args = parser.parse_args()
+target_arch = args.arch or platform.machine()
+suffix = '/'+target_arch if target_arch != platform.machine() else ''
+OUT = ROOT / ('output/release'+suffix+'/weather' if args.profile == 'release' else 'output/rain-shelter')
 OUT.mkdir(parents=True, exist_ok=True)
 EMPTY = OUT / 'empty-sessions'
 EMPTY.mkdir(exist_ok=True)
-APP = ROOT / 'dist/development/VibeCute Dev.app/Contents/MacOS/CodexCaptions'
+bundle = 'VibeCute.app' if args.profile == 'release' else 'VibeCute Dev.app'
+APP = ROOT / ('dist/'+args.profile+suffix+'/'+bundle+'/Contents/MacOS/CodexCaptions')
+actual_arch = subprocess.check_output(['lipo','-archs',str(APP)],text=True).strip()
+assert actual_arch == target_arch, 'Smoke architecture must match the tested bundle'
 
 def last_record(path):
     if not path.exists():
@@ -130,7 +141,8 @@ try:
             subprocess.run(['defaults', 'delete', suite], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             seed.unlink(missing_ok=True)
     (OUT / 'signed-app-performance.json').write_text(json.dumps(dict(
-        environment='signed development app, one current display, fixed test-owned 40pt normal foreground window; isolated empty sessions; no audio; warmup 4s; sample 12s off/fallback and 8s sheltered',
+        environment=f'signed {args.profile} app, one current display, fixed test-owned foreground windows; isolated empty sessions; no audio; warmup 4s; sample 12s off/fallback and 8s sheltered',
+        app=str(APP),architecture=actual_arch,
         comparison='same desktop fixture, rain off versus rain on with fallback actor; includes rain rendering and actor costs together',
         exclusions=['not a separate WindowServer/GPU measurement', 'not multi-display or long-term acceptance'],
         fixtures=fixtures, scenarios=reports), ensure_ascii=False, indent=2))

@@ -127,11 +127,17 @@ delegate.showPopover(); settle()
 precondition(delegate.popover.isShown, "Native status popover must actually open")
 precondition(delegate.popover.contentViewController!.view.bounds.width == 340)
 let menuController = delegate.popover.contentViewController as! NSHostingController<MenuPanelView>
+func scrollView(in view: NSView) -> NSScrollView? {
+    if let scroll = view as? NSScrollView { return scroll }
+    return view.subviews.compactMap { scrollView(in: $0) }.first
+}
 menuController.rootView.maximumHeight = 1000
 settle()
 let compactHeight = menuController.view.bounds.height
-print("Measured compact height: \(compactHeight)")
-precondition(compactHeight > 400 && compactHeight < 700, "Menu should fit natural content, without the old 720pt blank area")
+let naturalHeight = scrollView(in:menuController.view)!.documentView!.bounds.height
+print("Measured compact height: \(compactHeight), scroll content: \(naturalHeight)")
+precondition(compactHeight > 400 && compactHeight < 1000, "Menu must fit below the screen cap including the audio controls")
+precondition(abs(compactHeight-naturalHeight)<2, "Uncapped menu must match its actual content without clipping or blank padding")
 delegate.model.companionEnabled = true
 settle()
 let expandedHeight = menuController.view.bounds.height
@@ -143,10 +149,6 @@ capture(menuController.view, "adaptive-menu")
 menuController.rootView.maximumHeight = 300
 settle()
 precondition(abs(menuController.view.bounds.height - 300) < 1, "Small screen must cap the menu")
-func scrollView(in view: NSView) -> NSScrollView? {
-    if let scroll = view as? NSScrollView { return scroll }
-    return view.subviews.compactMap { scrollView(in: $0) }.first
-}
 let scroll = scrollView(in: menuController.view)!
 precondition(scroll.documentView!.bounds.height > scroll.contentView.bounds.height)
 scroll.contentView.scroll(to: NSPoint(x: 0, y: 200))

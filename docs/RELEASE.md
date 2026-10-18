@@ -49,6 +49,7 @@ CAPTIONS_BUILD_PROFILE=release bash scripts/settings_ui_checks.sh
 python3 scripts/onboarding_checks.py --profile release
 bash scripts/release_core_checks.sh
 python3 scripts/release_smoke.py --seconds 20
+python3 scripts/rain_shelter_smoke.py --profile release
 python3 scripts/verify_release.py dist/release/VibeCute.app --report output/release/bundle-check.json
 ```
 
@@ -57,6 +58,8 @@ Release core 检查直接链接最终 Release 的 core 对象，检查 BeatNet �
 加速积压后的恢复、缺少运行时无替代路径、环境覆盖无效及 MFCC 特征。
 该回放是合成输入，不代表真实歌曲、长时间 CPU/能耗或系统音频授权验收。
 原生设置检查与性能采样不要并发运行，资源测量也不要与编译并发。
+
+天气烟测先编译 `Tests/RainShelterWindowFixture.swift` 到 `.build/rain-shelter-window-fixture`，使用自建空白前台窗口与隔离偏好，比较雨关、局部往返和底边内侧到达三个场景；记录进程CPU、RSS、物理footprint与真实位置，不读取用户窗口内容。Intel包可加 `--arch x86_64`，在Apple Silicon上执行时只代表Rosetta检查。天气和字幕等其他原生窗口验收结束后再单独采样；不把模拟计时、Rosetta结果或局部进程指标当成GPU、多屏、长期或Intel真机验收。
 
 ## 分发边界
 
