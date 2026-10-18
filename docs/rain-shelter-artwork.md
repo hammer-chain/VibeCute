@@ -1,0 +1,11 @@
+# 蓝鱼顶盆避雨动作
+
+用户于 2026-10-18 确认 v5 动作帧可用。资源为内置图像生成工具参考现有蓝鱼绘制的完整角色帧，不包含 v4 的分离腿袜/鞋子拼装。
+
+- `Sources/CodexCaptions/Resources/DeepSeekThinking/RainShelter/frame-01.png` 至 `frame-08.png`：拿盆、翻扣头顶、起身，0.2 秒/帧。
+- `frame-09.png` 至 `frame-16.png`：顶盆小跑，0.1 秒/帧，可循环，行进方向朝左时整体镜像。
+- `frame-17.png` 至 `frame-24.png`：减速、摘盆、放盆、坐下，0.25 秒/帧。
+
+每帧 384×512，RGBA 透明 PNG，足底参考线 y=480。原生绘制共用固定脚线，不逐帧缩放角色。左右朝向共用同一组缓存，不额外复制像素。24 帧完整解码的上限约 18 MiB。
+
+生成提示词保存在 [rain-shelter-generation-prompt.txt](rain-shelter-generation-prompt.txt)。角色既有美术署名沿用主项目。此素材提交不包含旧版失败预览、桌面截图或用户临时文件路径。

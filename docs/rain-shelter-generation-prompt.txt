@@ -1,0 +1,15 @@
+Use case: identity-preserve. Create a corrected FULL-BODY 8-keyframe run cycle for the exact blue whale chibi maid holding an inverted stainless steel washbasin over her head.
+Image 1 is the identity, rendering style and basin reference. Image 2 is the same character's authentic SIDE-VIEW running pose reference; use its coherent pelvis, bent knees, calf and shoe anatomy instead of assembling front-view leg parts.
+Make exactly 4 columns x 2 rows, transparent sprite sheet, 1536x1024. Complete character in each 384x512 cell. All eight look and move toward SCREEN RIGHT in a consistent SIDE / slight three-quarter profile. Same scale and camera, same floor, no mirroring. Preserve original round face, large blue eye(s), cobalt hair/cyan ends, fin ears, navy-and-white maid dress and whale apron, little tan bows, white frilled ankle socks, navy shoes, flowing hair and whale tail to LEFT. Each hand continuously grips the SAME inverted steel basin rim above her head. Bowl rests over the crown, not floating.
+CRITICAL: draw every pose as one anatomically connected character. Both legs originate from a coherent pelvis under the middle of the skirt. Each thigh joins its own knee, calf and shoe in the SAME side perspective. No pasted tubes, detached socks, front-facing shoes, straight dangling knees, growing/shrinking limbs, or broken hip connections. Short chibi legs with smoothly bent knees and natural closed skirt.
+Animation order reading left-to-right top row then bottom:
+1 NEAR leg extended forward-right for contact, FAR leg folded up behind-left.
+2 NEAR support leg bends slightly beneath pelvis as body moves forward, FAR knee recovers forward under skirt.
+3 NEAR leg extends backward-left pushing off, FAR thigh/knee lifts ahead-right; strong readable bent recovery.
+4 Airborne passing: NEAR heel tucked back toward skirt, FAR calf reaches ahead for contact, both feet briefly off floor.
+5 FAR leg extended forward-right for contact, NEAR leg folded up behind-left. This is the OPPOSITE anatomical leg lead from frame 1. Keep upper body facing RIGHT. Show the far forward thigh behind skirt/near thigh, near folded thigh in foreground.
+6 FAR support leg bends below pelvis, NEAR knee advances forward.
+7 FAR leg extends backward-left pushing off, NEAR knee rises ahead-right.
+8 Airborne passing: FAR heel tucked back, NEAR calf reaches ahead ready to return to frame1.
+The silhouette should evolve continuously from spread legs through crossing/passing into opposite spread. Natural tiny torso bob, skirt/hair/tail follow-through, steady hands/basin. No giant leaps, no seated or suspended pose, no repeating same-leg-forward in all cells.
+Fully rendered original chibi anime cel-shaded illustration, not a rig diagram. Real transparent alpha, no scenery, rain, numbers, text, borders or grid. Put silhouette inside each cell with transparent gutters and no cropping.
