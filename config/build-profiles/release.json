@@ -22,7 +22,8 @@
   ],
   "resource_files": [
     "LipVowels.json",
-    "rain.wav"
+    "rain.wav",
+    "thunder.wav"
   ],
   "excluded_resources": [
     "DeepSeekThinking/Kira"

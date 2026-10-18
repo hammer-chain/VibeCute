@@ -1,6 +1,7 @@
 """Failure-path checks without touching the user's signing keychain."""
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import tempfile
@@ -16,6 +17,17 @@ def module(name):
 
 
 class SourceTests(unittest.TestCase):
+    def test_audio_resources_reach_both_signed_profiles(self):
+        # SwiftPM debug tests can pass while the explicit signed-app assembler
+        # silently omits a sound. Check the two independent resource manifests.
+        declared = set(re.findall(r'\.copy\("Resources/([^"/]+\.wav)"\)',
+                                  (ROOT / 'Package.swift').read_text()))
+        self.assertTrue(declared)
+        for name in ['development', 'release']:
+            profile = json.loads((ROOT / 'config/build-profiles' / (name+'.json')).read_text())
+            self.assertFalse(declared - set(profile['resource_files']),
+                             f'{name} omits SwiftPM audio: {declared-set(profile["resource_files"])}')
+
     def test_no_git_and_no_parent_borrow(self):
         provenance = module('source_provenance')
         with tempfile.TemporaryDirectory(dir=ROOT / '.build') as directory:
