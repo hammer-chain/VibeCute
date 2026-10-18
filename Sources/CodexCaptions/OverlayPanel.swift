@@ -561,6 +561,14 @@ final class SubtitleView: NSView {
         needsDisplay = true
     }
     private(set) var rainShelterPose: RainShelterPose?
+    private(set) var basinRainSplash = BasinRainSplash()
+    func receiveBasinRain(_ impact: RainBasinImpact, at now: Double) {
+        guard let pose = rainShelterPose, (4...18).contains(pose.frame) else { return }
+        basinRainSplash.add(impact,at:now); needsDisplay = true
+    }
+    func advanceBasinRain(at now: Double) {
+        if basinRainSplash.advance(at:now) { needsDisplay = true }
+    }
     func setRainShelterThinking(_ enabled: Bool) {
         guard rainShelterThinking != enabled else { return }
         rainShelterThinking = enabled
@@ -575,6 +583,7 @@ final class SubtitleView: NSView {
             cancelSeatedRecovery(); sequenceIndex = 0
         }
         rainShelterPose = pose
+        if pose == nil || !(4...18).contains(pose!.frame) { basinRainSplash.clear() }
         refreshSeatedMotion(); refreshGazeTracking(); needsDisplay = true
     }
 
@@ -882,7 +891,9 @@ final class SubtitleView: NSView {
     func setMascot(_ kind: CaptionMascot?, animating: Bool, pinkBear: Bool = false) {
         requestedMascotAnimating = animating
         if kind != mascotKind || pinkBear != usesPinkBear || mode != .character { cancelHeadPat() }
-        if kind != mascotKind || pinkBear != usesPinkBear { sequenceIndex = 0; cancelSeatedRecovery() }
+        if kind != mascotKind || pinkBear != usesPinkBear {
+            sequenceIndex = 0; cancelSeatedRecovery(); basinRainSplash.clear()
+        }
         if kind != mascotKind || pinkBear != usesPinkBear {
             sleepSample = nil; hoodieSingingPose = nil; hoodieScootPose = nil; hoodieSingingPlayback = OrangeHoodieSingingPlayback()
         }
@@ -1065,6 +1076,10 @@ final class SubtitleView: NSView {
         }
         if let pose = rainShelterPose {
             DeepSeekRainArtwork.shared.draw(frame:pose.frame,mirrored:pose.mirrored,in:bounds,scale:layoutScale)
+            if includeEffects, let panel = window, let display = NSScreen.screens.first,
+               let context = NSGraphicsContext.current?.cgContext {
+                basinRainSplash.draw(in:context,panelOrigin:panel.frame.origin,displayTop:display.frame.maxY)
+            }
             return
         }
         if let sample = sleepSample {

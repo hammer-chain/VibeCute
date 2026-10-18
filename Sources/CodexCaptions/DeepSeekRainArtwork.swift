@@ -8,8 +8,13 @@ struct RainShelterPose: Equatable { var frame: Int; var mirrored: Bool }
 final class DeepSeekRainArtwork {
     static let shared = DeepSeekRainArtwork()
     let frames: [NSImage]
+    private let basinRoofs: [String: [[Double]]]
     var available: Bool { frames.count == 32 }
     private init() {
+        let roofURL = Bundle.main.url(forResource:"basin-roofs",withExtension:"json",subdirectory:"DeepSeekThinking/RainShelter")
+            ?? Bundle.module.url(forResource:"basin-roofs",withExtension:"json",subdirectory:"DeepSeekThinking/RainShelter")
+        basinRoofs = roofURL.flatMap { try? Data(contentsOf:$0) }
+            .flatMap { try? JSONDecoder().decode([String:[[Double]]].self,from:$0) } ?? [:]
         frames = (1...32).compactMap { index in
             let name = String(format:"frame-%02d",index), folder = "DeepSeekThinking/RainShelter"
             guard let url = Bundle.main.url(forResource:name,withExtension:"png",subdirectory:folder)
@@ -28,6 +33,18 @@ final class DeepSeekRainArtwork {
     static func body(in bounds: CGRect, scale: Double) -> CGRect {
         // Conservative union for both facings, all approved poses, and the basin.
         CGRect(x:bounds.midX-102*scale,y:2*scale,width:204*scale,height:212*scale)
+    }
+    func basinSurface(pose: RainShelterPose, in bounds: CGRect, origin: CGPoint,
+                      displayTop: Double, scale: Double, source: String) -> RainBasinSurface? {
+        guard let roof = basinRoofs[String(pose.frame)], roof.count == 9,
+              roof.allSatisfy({ $0.count == 2 && (0...512).contains($0[0]) && (0...640).contains($0[1]) }) else { return nil }
+        let rect = Self.canvas(in:bounds,scale:scale)
+        let points = roof.map { point -> RainPoint in
+            let x = rect.minX+point[0]*rect.width/512
+            let y = rect.maxY-point[1]*rect.height/640
+            return RainPoint(x:origin.x+(pose.mirrored ? bounds.midX*2-x : x),y:displayTop-origin.y-y)
+        }
+        return RainBasinSurface(source:source,points:points,scale:scale)
     }
     func draw(frame: Int, mirrored: Bool, in bounds: CGRect, scale: Double) {
         guard frames.indices.contains(frame) else { return }

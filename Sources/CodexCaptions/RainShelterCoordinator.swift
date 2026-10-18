@@ -22,6 +22,20 @@ final class RainShelterCoordinator {
     private(set) var plans = 0
     private(set) var ticks = 0
     var sources: Set<CaptionMascot> { Set(actors.keys) }
+    var basinSurfaces: [RainBasinSurface] {
+        guard let display = NSScreen.screens.first else { return [] }
+        return overlays.rainShelterActors.prefix(2).compactMap { source,character in
+            guard actors[source] != nil, let pose = character.subtitle.rainShelterPose,
+                  !character.panel.isManuallyDragging else { return nil }
+            return DeepSeekRainArtwork.shared.basinSurface(pose:pose,in:character.subtitle.bounds,
+                origin:character.panel.frame.origin,displayTop:display.frame.maxY,
+                scale:Double(character.subtitle.layoutScale),source:source.rawValue)
+        }
+    }
+    func receiveBasinImpact(_ impact: RainBasinImpact, at now: Double) {
+        guard let source = CaptionMascot(rawValue:impact.source), actors[source] != nil else { return }
+        overlays.character(for:source)?.subtitle.receiveBasinRain(impact,at:now)
+    }
     init(overlays: ProjectOverlays) { self.overlays = overlays }
     private func stop(_ source: CaptionMascot) {
         if actors[source]?.controlling == true { overlays.endBackdropRelocation(for:source) }
@@ -72,6 +86,7 @@ final class RainShelterCoordinator {
                 } else { actor.fallbackAnchor = nil }
             }
             let previous = actor.motion.phase
+            character.subtitle.advanceBasinRain(at:now)
             let sample = actor.motion.update(at:now,raining:snapshot.raining,route:actor.route,scale:scale)
             if sample.frame != nil || actor.controlling {
                 if !actor.controlling { overlays.beginBackdropRelocation(for:source); actor.controlling = true }

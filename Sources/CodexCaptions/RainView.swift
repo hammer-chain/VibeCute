@@ -24,6 +24,8 @@ final class RainView: NSView {
     private var enabled = true
     private var elapsed = 0.0
     private var snowflakes: [Splash] = []
+    private(set) var basinImpacts: [RainBasinImpact] = []
+    private(set) var basinHits = 0
     var particleCount: Int { drops.count + splashes.count + snowflakes.count }
 
     init(frame: NSRect, region: RainRect) {
@@ -33,6 +35,7 @@ final class RainView: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     func clear() {
+        basinImpacts.removeAll(keepingCapacity:true)
         drops.removeAll()
         splashes.removeAll()
         birthBudget = 0
@@ -56,7 +59,9 @@ final class RainView: NSView {
         }
     }
 
-    func step(dt: Double, field: RoofField, enabled: Bool, settings: RainSettings, weatherTime: Double? = nil) {
+    func step(dt: Double, field: RoofField, enabled: Bool, settings: RainSettings, weatherTime: Double? = nil,
+              basins: [RainBasinSurface] = []) {
+        basinImpacts.removeAll(keepingCapacity:true)
         // Preserve particles during live slider drags. Every surviving drop is
         // checked against the new wind's backwards ray and updated size below;
         // only newly sheltered drops are removed, never the whole rain field.
@@ -92,6 +97,7 @@ final class RainView: NSView {
         }
         var survivors: [Drop] = []
         survivors.reserveCapacity(drops.count)
+        let activeBasins = basins.prefix(2)
         for var drop in drops {
             if field.isSheltered(drop.point, wind: settings.wind, padding: radius) { continue }
             let verticalDistance = drop.speed * settings.speed * dt
@@ -101,6 +107,22 @@ final class RainView: NSView {
             let hit: RainHit?
             if let a = windowHit, let b = groundHit { hit = a.time <= b.time ? a : b }
             else { hit = windowHit ?? groundHit }
+            if !activeBasins.isEmpty {
+                var basinHit: RainBasinImpact?
+                for basin in activeBasins {
+                    if let contact = basin.firstImpact(from:drop.point,to:next),
+                       (hit == nil || contact.time < hit!.time),
+                       (basinHit == nil || contact.time < basinHit!.hit.time),
+                       !field.isSheltered(contact.point,wind:settings.wind) {
+                        basinHit = RainBasinImpact(source:basin.source,hit:contact,scale:basin.scale)
+                    }
+                }
+                if let basinHit {
+                    basinHits += 1
+                    if basinImpacts.count < 12 { basinImpacts.append(basinHit) }
+                    continue // Steel stops the drop; the splash draws above the mascot.
+                }
+            }
             if let hit = hit {
                 addSplash(at: hit)
                 continue

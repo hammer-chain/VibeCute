@@ -25,6 +25,52 @@ struct RainHit {
     var normal: RainPoint // Outward-facing surface normal.
 }
 
+struct RainBasinImpact {
+    var source: String
+    var hit: RainHit
+    var scale: Double
+}
+
+/// Registered steel dome, at most nine points. Coordinates match rain/window
+/// geometry (global Quartz points). The bounding box rejects distant drops.
+struct RainBasinSurface {
+    let source: String
+    let points: [RainPoint]
+    let bounds: RainRect
+    let scale: Double
+    init?(source: String, points: [RainPoint], scale: Double) {
+        guard (2...9).contains(points.count), scale.isFinite, scale > 0,
+              points.allSatisfy({ $0.x.isFinite && $0.y.isFinite }) else { return nil }
+        self.source = source; self.points = points; self.scale = scale
+        let xs = points.map(\.x), ys = points.map(\.y)
+        bounds = RainRect(x:xs.min()!,y:ys.min()!,width:xs.max()!-xs.min()!,height:ys.max()!-ys.min()!)
+    }
+    func overlaps(_ region: RainRect) -> Bool {
+        bounds.maxX >= region.x && bounds.x <= region.maxX && bounds.maxY >= region.y && bounds.y <= region.maxY
+    }
+    func firstImpact(from start: RainPoint, to end: RainPoint) -> RainHit? {
+        guard end.y > start.y,
+              max(start.x,end.x) >= bounds.x, min(start.x,end.x) <= bounds.maxX,
+              max(start.y,end.y) >= bounds.y, min(start.y,end.y) <= bounds.maxY else { return nil }
+        let r = RainPoint(x:end.x-start.x,y:end.y-start.y)
+        func cross(_ a: RainPoint,_ b: RainPoint) -> Double { a.x*b.y-a.y*b.x }
+        var best: RainHit?
+        for (a,b) in zip(points,points.dropFirst()) {
+            let s = RainPoint(x:b.x-a.x,y:b.y-a.y), q = RainPoint(x:a.x-start.x,y:a.y-start.y)
+            let denominator = cross(r,s)
+            guard abs(denominator) > 1e-9 else { continue }
+            let t = cross(q,s)/denominator, u = cross(q,r)/denominator
+            guard t >= 0, t <= 1, u >= 0, u <= 1, best == nil || t < best!.time else { continue }
+            let length = (s.x*s.x+s.y*s.y).squareRoot()
+            guard length > 0 else { continue }
+            var normal = RainPoint(x:s.y/length,y:-s.x/length)
+            if normal.y > 0 { normal = normal * -1 }
+            best = RainHit(time:t,point:start+r*t,normal:normal)
+        }
+        return best
+    }
+}
+
 // Slab intersection works for vertical rays, angled rays, sides and thin windows.
 // maxTime = 1 tests the complete swept segment; infinity tests a ray.
 func rayHit(origin: RainPoint, direction: RainPoint, rect: RainRect,

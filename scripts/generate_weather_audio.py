@@ -39,3 +39,22 @@ with wave.open(str(path),'wb') as output:
     output.setparams((2,2,RATE,0,'NONE','not compressed'))
     output.writeframes(pcm.tobytes())
 print(f'Original thunder: {DURATION}s, {RATE}Hz stereo PCM, {path.stat().st_size} bytes')
+
+# Small damped, inharmonic steel modes and a soft initial water transient.
+# One authored hit; the app reuses two voices with a tiny rate variation.
+rng = random.Random(2026101802)
+hits = []
+for i in range(round(RATE*.24)):
+    t = i/RATE
+    attack = 1-math.exp(-t/.0007)
+    metal = sum(weight*math.sin(2*math.pi*hz*t)*math.exp(-t/decay)
+                for hz,weight,decay in [(1320,.55,.055),(2135,.4,.035),(3571,.3,.022),(5823,.16,.014)])
+    transient = rng.uniform(-1,1)*.16*math.exp(-t/.004)
+    hits.append((metal+transient)*attack*min(1,(.24-t)/.025))
+peak = max(map(abs,hits))
+pcm = array('h',(round(x/peak*.58*32767) for x in hits))
+if sys.byteorder != 'little': pcm.byteswap()
+path = ROOT/'Sources/CodexCaptions/Resources/basin-hit.wav'
+with wave.open(str(path),'wb') as output:
+    output.setparams((1,2,RATE,0,'NONE','not compressed')); output.writeframes(pcm.tobytes())
+print(f'Original steel basin hit: .24s, {RATE}Hz mono PCM, {path.stat().st_size} bytes')

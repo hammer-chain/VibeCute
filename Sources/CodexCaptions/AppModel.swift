@@ -768,6 +768,8 @@ final class AppModel: ObservableObject {
     func start() {
         rainStarted = true
         desktopRain.onSuspension = { [weak self] in self?.rainShelter.stopAll() }
+        desktopRain.basinProvider = { [weak self] in self?.rainShelter.basinSurfaces ?? [] }
+        desktopRain.onBasinImpact = { [weak self] impact,now in self?.rainShelter.receiveBasinImpact(impact,at:now) }
         desktopRain.onStatus = { [weak self] message in
             guard let self else { return }
             if self.weatherPreview == nil, self.rainRenderStatus != message { self.rainRenderStatus = message }

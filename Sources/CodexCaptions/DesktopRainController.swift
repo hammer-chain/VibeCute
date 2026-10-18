@@ -39,6 +39,13 @@ final class DesktopRainController {
     private(set) var soundStatus = "天气音效已关闭"
     var onStatus: ((String) -> Void)?
     var onSuspension: (() -> Void)?
+    var basinProvider: (() -> [RainBasinSurface])?
+    var onBasinImpact: ((RainBasinImpact,Double) -> Void)?
+    private var basinVoices: [AVAudioPlayer] = []
+    private var basinAudioAttempted = false
+    private var lastBasinSound = -Double.infinity
+    private(set) var basinSoundPlays = 0
+    private(set) var basinHits = 0
 
     init() {
         observe(NotificationCenter.default, NSApplication.didChangeScreenParametersNotification) { [weak self] in
@@ -76,6 +83,7 @@ final class DesktopRainController {
         timer?.invalidate(); timer = nil
         player?.stop(); player = nil
         thunderPlayer?.stop(); thunderPlayer = nil
+        stopBasinAudio(release:true)
         weatherElapsed = 0; lastThunderCycle = -1
         soundStatus = soundEnabled ? "天气音效随雨效暂停" : "天气音效已关闭"
         windows.forEach { $0.close() }; windows.removeAll(); views.removeAll()
@@ -124,7 +132,17 @@ final class DesktopRainController {
         lastFrame = now
         weatherElapsed += dt
         geometry.refresh(now: now)
-        for view in views { view.step(dt: dt, field: geometry.field, enabled: geometry.available, settings: settings, weatherTime: weatherElapsed) }
+        let basins = settings.style == .snow ? [] : Array((basinProvider?() ?? []).prefix(2))
+        if !basins.contains(where:{ $0.points.contains(where:{ !geometry.field.isSheltered($0,wind:settings.wind) }) }) {
+            stopBasinAudio(release:false)
+        }
+        for view in views {
+            view.step(dt:dt,field:geometry.field,enabled:geometry.available,settings:settings,
+                      weatherTime:weatherElapsed,basins:basins.filter { $0.overlaps(view.region) })
+            for impact in view.basinImpacts {
+                processBasinImpact(impact,at:now)
+            }
+        }
         if settings.style == .thunder, let cycle = WeatherStormTiming.soundCycle(at: weatherElapsed), cycle > lastThunderCycle {
             lastThunderCycle = cycle
             if soundEnabled, let thunderPlayer {
@@ -140,6 +158,7 @@ final class DesktopRainController {
     private func updateAudio() {
         guard soundEnabled, settings.style != .snow else {
             player?.stop(); player = nil; thunderPlayer?.stop(); thunderPlayer = nil
+            stopBasinAudio(release:true)
             soundStatus = soundEnabled ? "下雪不播放音效" : "天气音效已关闭"; return
         }
         do {
@@ -151,6 +170,7 @@ final class DesktopRainController {
             }
             if player?.isPlaying != true, player?.play() != true { soundStatus = "雨声播放失败"; return }
             player?.setVolume(Float(volume), fadeDuration: 0.2)
+            for voice in basinVoices { voice.setVolume(Float(volume*0.32),fadeDuration:0.1) }
             soundStatus = "正在播放本地雨声"
             if settings.style == .thunder {
                 do {
@@ -177,6 +197,35 @@ final class DesktopRainController {
         return try AVAudioPlayer(contentsOf:url)
     }
 
+    private func stopBasinAudio(release: Bool) {
+        for voice in basinVoices where voice.isPlaying { voice.stop() }
+        lastBasinSound = -Double.infinity
+        if release { basinVoices.removeAll(); basinAudioAttempted = false }
+    }
+
+    private func playBasinAudio(at now: Double) {
+        guard soundEnabled, settings.style != .snow, now-lastBasinSound >= 0.125 else { return }
+        if !basinAudioAttempted {
+            basinAudioAttempted = true
+            do {
+                basinVoices = try (0..<2).map { _ in
+                    let audio = try loadAudio("basin-hit")
+                    audio.enableRate = true; audio.volume = Float(volume*0.32)
+                    guard audio.prepareToPlay() else { throw CocoaError(.fileReadCorruptFile) }
+                    return audio
+                }
+            } catch { soundStatus += " · 钢盆音效不可用"; return }
+        }
+        guard let voice = basinVoices.first(where:{ !$0.isPlaying }) else { return }
+        voice.currentTime = 0; voice.rate = Float.random(in:0.94...1.06)
+        if voice.play() { lastBasinSound = now; basinSoundPlays += 1 }
+    }
+
+    func processBasinImpact(_ impact: RainBasinImpact, at now: Double) {
+        guard timer != nil, !sleeping, !locked, settings.style != .snow else { return }
+        basinHits += 1; onBasinImpact?(impact,now); playBasinAudio(at:now)
+    }
+
     var shelterSnapshot: RainShelterSnapshot {
         RainShelterSnapshot(raining: timer != nil && (settings.style == .rain || settings.style == .thunder),
             suspended: sleeping || locked, frontWindow: geometry.available ? geometry.field.windows.first : nil,
@@ -191,6 +240,7 @@ final class DesktopRainController {
          "mouseTransparent": windows.allSatisfy(\.ignoresMouseEvents), "sound": soundStatus,
          "soundPlaying": player?.isPlaying == true, "thunderPlaying": thunderPlayer?.isPlaying == true,
          "thunderReady": thunderPlayer != nil, "thunderPlays": thunderPlays, "audioDecodes": audioDecodes,
-         "weatherElapsed": weatherElapsed]
+         "weatherElapsed": weatherElapsed,"basinHits":basinHits,"basinSoundPlays":basinSoundPlays,
+         "basinVoices":basinVoices.count,"basinSoundPlaying":basinVoices.contains(where:\.isPlaying)]
     }
 }
