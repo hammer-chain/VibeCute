@@ -59,6 +59,7 @@ try:
         time.sleep(.1)
     assert ready.exists(), 'No fixture window'
     fixtures = [json.loads(ready.read_text())]
+    assert fixtures[0]['foregroundWindowVerified'], 'Fixture must prove it is the actual foreground window'
     for label, wet, seconds in [('rain-off', False, 12), ('rain-on-fallback', True, 12), ('rain-on-sheltered', True, 8)]:
         if label == 'rain-on-sheltered':
             stop(fixture)
@@ -70,6 +71,7 @@ try:
                 time.sleep(.1)
             assert ready.exists(), 'No wide fixture window'
             fixtures.append(json.loads(ready.read_text()))
+            assert fixtures[-1]['foregroundWindowVerified'], 'Wide fixture is not actually in front'
         suite = 'local.vibecute.rain-shelter-smoke.' + uuid.uuid4().hex
         seed = OUT / (label + '-preferences.plist')
         diag = OUT / (label + '-diagnostics.jsonl')
