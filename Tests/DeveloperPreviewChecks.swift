@@ -69,6 +69,9 @@ import CaptionCore
         let otherBefore = model.developerPreviewCharacters.first { ($0["artwork"] as? String) == "codex" }!
         for action in [DeveloperPreviewAction.thinking, .mouth, .singing, .sleep, .sleepContinuous] {
             model.previewAction(action)
+            if action == .sleep || action == .sleepContinuous {
+                precondition(!model.developerPreviewCaptions.contains { ($0["id"] as? String) == "demo" }, "Sleep preview must not show a preview caption")
+            }
             let other = model.developerPreviewCharacters.first { ($0["artwork"] as? String) == "codex" }
             precondition(other != nil, "Claude workwear must remain visible during every fish preview")
             precondition(other?["id"] as? String == otherBefore["id"] as? String, "Keep the existing character lane")
@@ -81,6 +84,7 @@ import CaptionCore
         waitForCaption("预览期间字幕继续更新")
         RunLoop.main.run(until: Date().addingTimeInterval(DeepSeekSleepTimeline.duration + 1))
         precondition(model.demoMode, "Continuous sleep must outlast the complete wake-up timeline")
+        precondition(!model.developerPreviewCaptions.contains { ($0["id"] as? String) == "demo" })
         let sleeper = model.developerPreviewCharacters.first { ($0["artwork"] as? String) == "deepseek" }!
         precondition(sleeper["sleepPhase"] as? String == "趴着睡觉")
         precondition(model.developerPreviewCharacters.contains { ($0["artwork"] as? String) == "codex" })
