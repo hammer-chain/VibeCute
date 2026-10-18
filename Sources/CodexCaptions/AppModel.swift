@@ -16,6 +16,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var developerPreviewStatus = "选择角色后预览动作"
     private var requestedPreviewCharacter: CharacterChoice?
     private var demoCharacterOverride: CharacterChoice?
+    private var hidePreviewCaption = false
     private var isolatedActionPreview: Bool { demoMode && demoCharacterOverride != nil }
     private var demoMascot: CaptionMascot {
         guard isolatedActionPreview else { return demoDeepSeek ? .deepseek : .codex }
@@ -1028,7 +1029,7 @@ final class AppModel: ObservableObject {
 
     func showSleepDemo(continuous: Bool = false) {
         guard DeepSeekSleepArtwork.shared.available else { return }
-        showDemo(deepSeek: true)
+        showDemo(deepSeek: true, showCaption: false)
         singingDemoStartedAt = nil; mouthDemoStartedAt = nil; mouthDemoIndex = nil
         speechDemo = false; resetSinging()
         sleepDemoStartedAt = ProcessInfo.processInfo.systemUptime
@@ -1723,7 +1724,8 @@ final class AppModel: ObservableObject {
         if singingActionLabel != label { singingActionLabel = label }
     }
 
-    func showDemo(deepSeek: Bool = false, multiple: Bool = false) {
+    func showDemo(deepSeek: Bool = false, multiple: Bool = false, showCaption: Bool = true) {
+        hidePreviewCaption = !showCaption
         questionPreviewActive = false; questionPreviewRequest = nil; questionPreviewRevealAt = nil
         questionPreviewPreviousEnabled = nil
         singingStepDemo = false
@@ -1950,7 +1952,7 @@ final class AppModel: ObservableObject {
         let header = demoMode ? "\(demoDeepSeek ? "DSH" : "Codex")  ·  \(kind)  ·  VibeCute"
             : focused?.header ?? "VibeCute  ·  等待更新"
         var items: [OverlayItem] = []
-        if demoMode {
+        if demoMode && !hidePreviewCaption {
             items = [OverlayItem(id: "demo", text: currentText, header: header, title: title,
                                  active: !questionPreviewActive, mascot: demoMascot,
                                  typewriterID: typewriterEnabled && !questionPreviewActive ? "demo:\(demoTypewriterID)" : nil,
@@ -2090,6 +2092,7 @@ final class AppModel: ObservableObject {
         let codexMetricsSession = selected?.source == .codex ? selected : sessions.first { $0.source == .codex }
         let openCodeMetricsSession = selected?.source == .opencode ? selected : sessions.first { $0.source == .opencode }
         var restingMascots = Set<CaptionMascot>()
+        if enabled && demoMode && hidePreviewCaption { restingMascots.insert(demoMascot) }
         if enabled && (!demoMode || isolatedActionPreview) {
             if balanceAlertActive { restingMascots.insert(.deepseek) }
             if companionEnabled { restingMascots.insert(companionSource) }
