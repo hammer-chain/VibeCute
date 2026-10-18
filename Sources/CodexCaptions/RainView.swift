@@ -56,7 +56,7 @@ final class RainView: NSView {
         }
     }
 
-    func step(dt: Double, field: RoofField, enabled: Bool, settings: RainSettings) {
+    func step(dt: Double, field: RoofField, enabled: Bool, settings: RainSettings, weatherTime: Double? = nil) {
         // Preserve particles during live slider drags. Every surviving drop is
         // checked against the new wind's backwards ray and updated size below;
         // only newly sheltered drops are removed, never the whole rain field.
@@ -65,10 +65,7 @@ final class RainView: NSView {
         self.field = field
         self.enabled = enabled
         guard enabled else { clear(); return }
-        elapsed += dt
-        if settings.style == .sun || settings.style == .cloud {
-            needsDisplay = true; return
-        }
+        elapsed = weatherTime ?? (elapsed + dt)
         if settings.style == .snow {
             stepSnow(dt: dt, field: field); needsDisplay = true; return
         }
@@ -131,8 +128,6 @@ final class RainView: NSView {
         context.clear(bounds)
         guard enabled else { return }
         switch settings.style {
-        case .sun: drawSun(context); return
-        case .cloud: drawClouds(context, storm: false); return
         case .snow:
             context.setFillColor(NSColor(white: 1, alpha: 0.8).cgColor)
             context.beginPath()
@@ -141,7 +136,7 @@ final class RainView: NSView {
                                               width: flake.radius * 2, height: flake.radius * 2))
             }
             context.fillPath(); return
-        case .thunder: drawClouds(context, storm: true); drawLightning(context)
+        case .thunder: drawClouds(context); drawLightning(context)
         case .rain: break
         }
         context.setLineWidth(CGFloat(settings.size))
@@ -182,29 +177,10 @@ final class RainView: NSView {
         }
     }
 
-    private func drawSun(_ context: CGContext) {
-        let center = CGPoint(x: max(100, bounds.width - 160), y: 125)
-        for ring in stride(from: 4, through: 1, by: -1) {
-            let radius = CGFloat(42 + ring * 16)
-            context.setFillColor(NSColor(calibratedRed: 1, green: 0.77, blue: 0.3, alpha: 0.025).cgColor)
-            context.fillEllipse(in: CGRect(x: center.x-radius, y: center.y-radius, width: 2*radius, height: 2*radius))
-        }
-        context.setStrokeColor(NSColor(calibratedRed: 1, green: 0.83, blue: 0.4, alpha: 0.42).cgColor)
-        context.setLineWidth(3); context.setLineCap(.round); context.beginPath()
-        for ray in 0..<12 {
-            let angle = Double(ray) * .pi / 6 + elapsed * 0.025
-            context.move(to: CGPoint(x: center.x + cos(angle)*63, y: center.y + sin(angle)*63))
-            context.addLine(to: CGPoint(x: center.x + cos(angle)*78, y: center.y + sin(angle)*78))
-        }
-        context.strokePath()
-        context.setFillColor(NSColor(calibratedRed: 1, green: 0.8, blue: 0.32, alpha: 0.65).cgColor)
-        context.fillEllipse(in: CGRect(x: center.x-43, y: center.y-43, width: 86, height: 86))
-    }
-
-    private func drawClouds(_ context: CGContext, storm: Bool) {
-        context.setFillColor(NSColor(calibratedWhite: storm ? 0.34 : 0.83, alpha: storm ? 0.38 : 0.3).cgColor)
+    private func drawClouds(_ context: CGContext) {
+        context.setFillColor(NSColor(calibratedWhite: 0.34, alpha: 0.38).cgColor)
         for index in 0..<4 {
-            let offset = (elapsed * (storm ? 6 : 3) + Double(index) * Double(bounds.width) / 3)
+            let offset = (elapsed * 6 + Double(index) * Double(bounds.width) / 3)
                 .truncatingRemainder(dividingBy: Double(bounds.width) + 300) - 150
             let y = Double(45 + (index % 2) * 60)
             context.beginPath()
@@ -217,9 +193,8 @@ final class RainView: NSView {
     }
 
     private func drawLightning(_ context: CGContext) {
-        // A brief local bolt every six seconds; never flash the entire screen.
-        let phase = elapsed.truncatingRemainder(dividingBy: 6)
-        guard phase > 1, phase < 1.28 else { return }
+        // A brief local bolt; all displays share the audio owner's clock.
+        guard WeatherStormTiming.showsLightning(at: elapsed) else { return }
         let x = bounds.width * 0.68
         context.setStrokeColor(NSColor(calibratedRed: 0.88, green: 0.94, blue: 1, alpha: 0.85).cgColor)
         context.setLineWidth(3); context.setLineJoin(.round); context.beginPath()

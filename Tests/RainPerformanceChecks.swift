@@ -27,6 +27,6 @@ import QuartzCore
         }
         try JSONSerialization.data(withJSONObject: rows, options: [.sortedKeys,.prettyPrinted])
             .write(to: URL(fileURLWithPath:"output/desktop-rain/optimized-performance.json"))
-        print("Optimized weather simulation budget passed for 7 styles × 0/40/160 roofs")
+        print("Optimized weather simulation budget passed for \(DesktopWeatherPreview.allCases.count) styles × 0/40/160 roofs")
     }
 }

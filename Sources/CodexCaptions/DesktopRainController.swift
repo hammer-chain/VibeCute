@@ -29,9 +29,14 @@ final class DesktopRainController {
     private var soundEnabled = false
     private var volume = 0.35
     private var player: AVAudioPlayer?
+    private var thunderPlayer: AVAudioPlayer?
+    private var weatherElapsed = 0.0
+    private var lastThunderCycle = -1
+    private(set) var thunderPlays = 0
+    private(set) var audioDecodes = 0
     private(set) var frames = 0
     private(set) var stepSeconds = 0.0
-    private(set) var soundStatus = "雨声已关闭"
+    private(set) var soundStatus = "天气音效已关闭"
     var onStatus: ((String) -> Void)?
     var onSuspension: (() -> Void)?
 
@@ -61,19 +66,18 @@ final class DesktopRainController {
     deinit { stop(); for (center, token) in observers { center.removeObserver(token) } }
 
     func configure(active: Bool, settings: RainSettings, sound: Bool, volume: Double) {
-        let changedRate = frameRate(for: self.settings.style) != frameRate(for: settings.style)
+        if self.settings.style != settings.style { weatherElapsed = 0; lastThunderCycle = -1 }
         requested = active; self.settings = settings; soundEnabled = sound
-        self.volume = min(1, max(0, volume))
-        if changedRate { timer?.invalidate(); timer = nil }
+        self.volume = volume.isFinite ? min(1, max(0, volume)) : 0.35
         reconcile()
     }
-
-    private func frameRate(for style: DesktopWeatherStyle) -> Double { style == .sun || style == .cloud ? 12 : 30 }
 
     func stop() {
         timer?.invalidate(); timer = nil
         player?.stop(); player = nil
-        soundStatus = soundEnabled ? "雨声随雨效暂停" : "雨声已关闭"
+        thunderPlayer?.stop(); thunderPlayer = nil
+        weatherElapsed = 0; lastThunderCycle = -1
+        soundStatus = soundEnabled ? "天气音效随雨效暂停" : "天气音效已关闭"
         windows.forEach { $0.close() }; windows.removeAll(); views.removeAll()
     }
 
@@ -85,7 +89,7 @@ final class DesktopRainController {
         if timer == nil {
             rebuildScreens()
             lastFrame = CACurrentMediaTime()
-            let clock = Timer(timeInterval: 1 / frameRate(for: settings.style), repeats: true) { [weak self] _ in self?.tick() }
+            let clock = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.tick() }
             clock.tolerance = 0.003
             RunLoop.main.add(clock, forMode: .common)
             timer = clock
@@ -118,20 +122,29 @@ final class DesktopRainController {
     private func tick() {
         let now = CACurrentMediaTime(), dt = max(0, min(now - lastFrame, 0.1))
         lastFrame = now
+        weatherElapsed += dt
         geometry.refresh(now: now)
-        for view in views { view.step(dt: dt, field: geometry.field, enabled: geometry.available, settings: settings) }
+        for view in views { view.step(dt: dt, field: geometry.field, enabled: geometry.available, settings: settings, weatherTime: weatherElapsed) }
+        if settings.style == .thunder, let cycle = WeatherStormTiming.soundCycle(at: weatherElapsed), cycle > lastThunderCycle {
+            lastThunderCycle = cycle
+            if soundEnabled, let thunderPlayer {
+                thunderPlayer.currentTime = 0
+                if thunderPlayer.play() { thunderPlays += 1 }
+                else { soundStatus = "雨声播放中 · 雷声播放失败" }
+            }
+        }
         frames += 1; stepSeconds += CACurrentMediaTime() - now
         onStatus?(geometry.available ? "桌面天气效果正在显示" : "窗口边界不可用 · 雨效已隐藏")
     }
 
     private func updateAudio() {
-        guard soundEnabled else { player?.stop(); player = nil; soundStatus = "雨声已关闭"; return }
+        guard soundEnabled, settings.style != .snow else {
+            player?.stop(); player = nil; thunderPlayer?.stop(); thunderPlayer = nil
+            soundStatus = soundEnabled ? "下雪不播放音效" : "天气音效已关闭"; return
+        }
         do {
             if player == nil {
-                guard let url = Bundle.module.url(forResource: "rain", withExtension: "wav") else {
-                    soundStatus = "缺少雨声文件"; return
-                }
-                let audio = try AVAudioPlayer(contentsOf: url)
+                let audio = try loadAudio("rain")
                 audio.numberOfLoops = -1; audio.volume = 0
                 guard audio.prepareToPlay() else { soundStatus = "雨声无法播放"; return }
                 player = audio
@@ -139,7 +152,29 @@ final class DesktopRainController {
             if player?.isPlaying != true, player?.play() != true { soundStatus = "雨声播放失败"; return }
             player?.setVolume(Float(volume), fadeDuration: 0.2)
             soundStatus = "正在播放本地雨声"
+            if settings.style == .thunder {
+                do {
+                    if thunderPlayer == nil {
+                        let audio = try loadAudio("thunder")
+                        guard audio.prepareToPlay() else { soundStatus = "雨声播放中 · 雷声无法播放"; return }
+                        thunderPlayer = audio
+                    }
+                    thunderPlayer?.setVolume(Float(volume*0.85), fadeDuration: 0.2)
+                    soundStatus = "雨声播放中 · 闪电后播放雷声"
+                } catch {
+                    thunderPlayer = nil; soundStatus = "雨声播放中 · 雷声文件无法解码"
+                }
+            } else { thunderPlayer?.stop(); thunderPlayer = nil }
         } catch { player = nil; soundStatus = "雨声文件无法解码" }
+    }
+
+    private func loadAudio(_ name: String) throws -> AVAudioPlayer {
+        guard let url = Bundle.main.url(forResource:name,withExtension:"wav")
+                ?? Bundle.module.url(forResource:name,withExtension:"wav") else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        audioDecodes += 1
+        return try AVAudioPlayer(contentsOf:url)
     }
 
     var shelterSnapshot: RainShelterSnapshot {
@@ -152,8 +187,10 @@ final class DesktopRainController {
         ["active": timer != nil, "windowCount": windows.count, "frames": frames,
          "geometryQueries": geometry.queryCount, "stepSeconds": stepSeconds,
          "particles": views.reduce(0) { $0 + $1.particleCount }, "geometryAvailable": geometry.available,
-         "style": settings.style.rawValue, "targetFPS": frameRate(for: settings.style),
+         "style": settings.style.rawValue, "targetFPS": 30,
          "mouseTransparent": windows.allSatisfy(\.ignoresMouseEvents), "sound": soundStatus,
-         "soundPlaying": player?.isPlaying == true]
+         "soundPlaying": player?.isPlaying == true, "thunderPlaying": thunderPlayer?.isPlaying == true,
+         "thunderReady": thunderPlayer != nil, "thunderPlays": thunderPlays, "audioDecodes": audioDecodes,
+         "weatherElapsed": weatherElapsed]
     }
 }

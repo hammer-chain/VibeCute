@@ -337,13 +337,13 @@ struct SettingsView: View {
                     valueText: String(format: "%.0f°", model.desktopRainWind))
       settingSlider("雨滴数量", value: $model.desktopRainQuantity, range: 0.35...3,
                     valueText: String(format: "%.2f×", model.desktopRainQuantity))
-      Toggle("播放雨声", isOn: $model.desktopRainSound)
+      Toggle("天气音效（雨声与雷声）", isOn: $model.desktopRainSound)
       if model.desktopRainSound {
         Text(model.rainSoundStatus).font(.caption).foregroundStyle(.secondary)
-        settingSlider("雨声音量", value: $model.desktopRainVolume, range: 0...1,
+        settingSlider("天气音效音量", value: $model.desktopRainVolume, range: 0...1,
                       valueText: "\(Int(model.desktopRainVolume * 100))%")
       }
-      Text("雨效穿透鼠标，普通窗口会挡雨。关闭后停止动画和雨声。")
+      Text("下雨循环播放雨声，雷雨在闪电后响起雷声；晴天、阴天不显示效果。关闭后停止动画和音效。")
         .font(.caption).foregroundStyle(.secondary)
     }
   }

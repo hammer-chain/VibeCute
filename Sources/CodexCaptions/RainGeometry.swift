@@ -89,15 +89,27 @@ func floorImpact(from start: RainPoint, to end: RainPoint, floorY: Double) -> Ra
     return RainHit(time: t, point: RainPoint(x: start.x + (end.x - start.x) * t, y: floorY), normal: RainPoint(x: 0, y: -1))
 }
 
-enum DesktopWeatherStyle: String { case rain, sun, cloud, snow, thunder }
+enum DesktopWeatherStyle: String { case rain, snow, thunder }
+
+/// One clock shared by every display and the single audio owner. A distant
+/// rumble follows each local bolt; neither display count nor redraws multiply it.
+enum WeatherStormTiming {
+    static let period = 12.0
+    static func showsLightning(at time: Double) -> Bool {
+        let phase = time.truncatingRemainder(dividingBy: period)
+        return phase >= 1 && phase < 1.28
+    }
+    static func soundCycle(at time: Double) -> Int? {
+        guard time.isFinite, time >= 1.55 else { return nil }
+        return Int((time-1.55)/period)
+    }
+}
 
 enum DesktopWeatherPreview: String, CaseIterable, Identifiable {
-    case sunny = "晴天", cloudy = "阴天", drizzle = "小雨", rain = "中雨", heavyRain = "大雨", snow = "下雪", thunder = "雷雨"
+    case drizzle = "小雨", rain = "中雨", heavyRain = "大雨", snow = "下雪", thunder = "雷雨"
     var id: String { rawValue }
     var settings: RainSettings {
         switch self {
-        case .sunny: return RainSettings(style: .sun)
-        case .cloudy: return RainSettings(style: .cloud)
         case .drizzle: return RainSettings(size: 0.7, speed: 0.65, quantity: 0.4)
         case .rain: return RainSettings()
         case .heavyRain: return RainSettings(size: 1.5, speed: 1.6, wind: 0.35, quantity: 2.8)

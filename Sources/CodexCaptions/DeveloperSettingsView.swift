@@ -25,7 +25,8 @@ struct DeveloperSettingsView: View {
                         }
                         Button("停止天气预览") { model.stopWeatherPreview() }
                         Text(model.weatherPreviewStatus).font(.caption).foregroundStyle(.secondary)
-                        Text("预览使用本地效果，无需联网且默认静音；关闭此窗口后恢复原设置。小雨、中雨、大雨、雷雨会触发蓝鱼拿盆避雨；没有位置时在附近往返跑。")
+                        Toggle("天气音效（雨声与雷声）", isOn: $model.desktopRainSound)
+                        Text("预览使用本地效果，无需联网，遵循天气音效开关与音量；下雪静音。关闭此窗口后恢复真实天气。小雨、中雨、大雨、雷雨会触发蓝鱼拿盆避雨。")
                             .font(.caption).foregroundStyle(.secondary)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }

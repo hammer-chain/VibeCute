@@ -14,10 +14,17 @@ import QuartzCore
                 "weather_code": Double(code), "rain": rain, "showers": showers]])
             return try RainWeatherClient.decode(data, now: now)
         }
-        for code in [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,99] { let value = try reading(code); precondition(value.raining) }
+        for code in [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,97,99] { let value = try reading(code); precondition(value.raining) }
         for code in [0,1,2,3,45,48,71,73,75,77,85,86] { let value = try reading(code); precondition(!value.raining) }
-        let mixedRain = try reading(3, rain: 0.1); precondition(mixedRain.raining)
-        let showers = try reading(3, showers: 0.1); precondition(showers.raining)
+        for code in 0...3 {
+            let fair = try reading(code,rain:0.1,showers:0.1)
+            precondition(!fair.raining && !fair.thunderstorm,"Fair weather must do nothing even with contradictory amounts")
+        }
+        for code in [95,96,97,99] { let storm = try reading(code); precondition(storm.thunderstorm) }
+        let normalRain = try reading(61); precondition(!normalRain.thunderstorm)
+        precondition(!WeatherStormTiming.showsLightning(at:0.9) && WeatherStormTiming.showsLightning(at:1.1))
+        precondition(WeatherStormTiming.soundCycle(at:1.28) == nil && WeatherStormTiming.soundCycle(at:1.55) == 0)
+        precondition(WeatherStormTiming.soundCycle(at:13.55) == 1)
         for (code, amount, age) in [(61,0.0,1801.0),(61,0.0,-301.0),(100,0.0,0.0),(0,-1.0,0.0)] {
             do { _ = try reading(code, rain: amount, age: age); fatalError("Invalid or stale reading accepted") } catch {}
         }
@@ -54,8 +61,8 @@ import QuartzCore
         defaults.set([], forKey: "trackedHarnesses"); defaults.set(true, forKey: "claudeTrackingMigrated")
         defaults.set(true, forKey: "doubaoTrackingMigrated"); defaults.set(false, forKey: "autoAvoidanceEnabled")
         defaults.set(false, forKey: "audioEnabled"); defaults.set(false, forKey: "autoWindowPeekEnabled")
-        var appWet = false
-        let appWeather = RainWeatherMonitor { _ in RainWeatherReading(raining: appWet, date: Date()) }
+        var appWet = false, appThunder = false
+        let appWeather = RainWeatherMonitor { _ in RainWeatherReading(raining: appWet, date: Date(), thunderstorm:appThunder) }
         let model = AppModel(rainWeather: appWeather)
         model.start(); wait()
         precondition(model.desktopRainDiagnostics["active"] as? Bool == false)
@@ -75,29 +82,46 @@ import QuartzCore
         precondition(model.desktopRainDiagnostics["active"] as? Bool == true, "Manual mode starts without weather")
         model.desktopRainVolume = 0; model.desktopRainSound = true; wait()
         precondition(model.desktopRainDiagnostics["soundPlaying"] as? Bool == true, "Bundled rain audio must load and play")
+        model.desktopRainAutomatic = true; appThunder = true; model.selectRainCity(city); wait()
+        precondition(model.desktopRainDiagnostics["style"] as? String == "thunder", "Actual weather lost its thunderstorm code")
+        precondition(model.desktopRainDiagnostics["thunderReady"] as? Bool == true)
+        let decoded = model.desktopRainDiagnostics["audioDecodes"] as! Int
+        for i in 0..<30 { model.desktopRainSize = 0.7+Double(i)/100 }
+        precondition(model.desktopRainDiagnostics["audioDecodes"] as! Int == decoded,"Slider updates repeatedly decoded audio")
+        wait(0.65)
+        precondition(model.desktopRainDiagnostics["thunderPlays"] as? Int == 0,"Thunder sounded before lightning")
+        wait(1.1)
+        precondition(model.desktopRainDiagnostics["thunderPlaying"] as? Bool == true)
+        precondition(model.desktopRainDiagnostics["thunderPlays"] as? Int == 1,"Thunder was multiplied by redraws/displays")
         NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.screensDidSleepNotification, object: nil)
         wait(); precondition(model.desktopRainDiagnostics["windowCount"] as? Int == 0)
         precondition(model.desktopRainDiagnostics["soundPlaying"] as? Bool == false)
+        precondition(model.desktopRainDiagnostics["thunderPlaying"] as? Bool == false)
         NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.screensDidWakeNotification, object: nil)
         wait(); precondition(model.desktopRainDiagnostics["active"] as? Bool == true)
         model.desktopRainSound = false
+        precondition(model.desktopRainDiagnostics["thunderReady"] as? Bool == false)
         let before = model.desktopRainDiagnostics["frames"] as! Int
         model.desktopRainSize = 2; model.desktopRainWind = -30; model.desktopRainQuantity = 3
         wait(0.3)
         precondition(model.desktopRainDiagnostics["frames"] as! Int > before)
         model.desktopRainEnabled = false
-        precondition(defaults.bool(forKey: "desktopRainAutomatic") == false)
+        precondition(defaults.bool(forKey: "desktopRainAutomatic") == true)
         precondition(defaults.data(forKey: "desktopRainCity") != nil)
 
         for preview in DesktopWeatherPreview.allCases {
+            model.desktopRainSound = true // zero volume: exercise the actual decoder silently
             model.previewWeather(preview); wait(0.12)
             precondition(model.desktopRainDiagnostics["style"] as? String == preview.settings.style.rawValue)
             precondition(model.desktopRainDiagnostics["active"] as? Bool == true)
-            precondition(model.desktopRainDiagnostics["soundPlaying"] as? Bool == false)
+            precondition(model.desktopRainDiagnostics["soundPlaying"] as? Bool == (preview != .snow))
+            precondition(model.desktopRainDiagnostics["thunderReady"] as? Bool == (preview == .thunder))
             precondition(!defaults.bool(forKey: "desktopRainEnabled"), "Preview must not change saved rain preference")
         }
         model.stopWeatherPreview(); wait()
         precondition(model.desktopRainDiagnostics["windowCount"] as? Int == 0)
+        precondition(model.desktopRainDiagnostics["soundPlaying"] as? Bool == false)
+        precondition(model.desktopRainDiagnostics["thunderPlaying"] as? Bool == false)
         // Export the real renderer for every weather style; no fabricated UI.
         for preview in DesktopWeatherPreview.allCases {
             let view = RainView(frame: NSRect(x: 0, y: 0, width: 960, height: 600),

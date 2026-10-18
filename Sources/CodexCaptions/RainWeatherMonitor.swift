@@ -14,6 +14,7 @@ struct RainCity: Codable, Equatable, Identifiable {
 struct RainWeatherReading {
     let raining: Bool
     let date: Date
+    var thunderstorm = false
     func isFresh(at now: Date) -> Bool {
         let age = now.timeIntervalSince(date)
         return age >= -300 && age <= 1800
@@ -71,8 +72,10 @@ enum RainWeatherClient {
         }
         // Current codes/amounts only. Snow/fog and forecast probabilities do not trigger rain.
         let rainCodes = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,97,99]
-        let reading = RainWeatherReading(raining: rainCodes.contains(current.weather_code) || current.rain + current.showers > 0,
-                                         date: Date(timeIntervalSince1970: current.time))
+        let fairWeather = (0...3).contains(current.weather_code)
+        let reading = RainWeatherReading(raining: !fairWeather && (rainCodes.contains(current.weather_code) || current.rain + current.showers > 0),
+                                         date: Date(timeIntervalSince1970: current.time),
+                                         thunderstorm: [95,96,97,99].contains(current.weather_code))
         guard reading.isFresh(at: now) else { throw RainWeatherError.stale }
         return reading
     }
@@ -89,6 +92,7 @@ final class RainWeatherMonitor {
     private var generation = 0
     private var lastAttempt = Date.distantPast
     private var reading: RainWeatherReading?
+    var thunderstormActive: Bool { reading.map { $0.isFresh(at: Date()) && $0.thunderstorm } ?? false }
     private(set) var requestCount = 0
     private var wakeObserver: NSObjectProtocol?
     private let fetch: (RainCity) async throws -> RainWeatherReading
@@ -131,7 +135,7 @@ final class RainWeatherMonitor {
                 guard reading.isFresh(at: Date()) else { throw RainWeatherError.stale }
                 self.reading = reading; self.request = nil
                 let time = reading.date.formatted(date: .omitted, time: .shortened)
-                self.onChange?(reading.raining, "\(city.name) · \(reading.raining ? "当前有雨 · 雨效开启" : "当前无雨 · 雨效待机") · \(time)")
+                self.onChange?(reading.raining, "\(city.name) · \(reading.thunderstorm ? "当前雷雨 · 雨效开启" : reading.raining ? "当前有雨 · 雨效开启" : "当前无雨 · 雨效待机") · \(time)")
             } catch {
                 guard !Task.isCancelled, let self, self.generation == token else { return }
                 self.reading = nil; self.request = nil
@@ -143,6 +147,7 @@ final class RainWeatherMonitor {
 
     var diagnostics: [String: Any] {
         ["enabled": city != nil, "requests": requestCount, "polling": timer != nil,
-         "inFlight": request != nil, "raining": reading?.raining ?? false, "provider": "Open-Meteo"]
+         "inFlight": request != nil, "raining": reading?.raining ?? false,
+         "thunderstorm": thunderstormActive, "provider": "Open-Meteo"]
     }
 }
