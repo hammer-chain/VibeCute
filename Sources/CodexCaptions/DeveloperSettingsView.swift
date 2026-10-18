@@ -25,7 +25,16 @@ struct DeveloperSettingsView: View {
                         }
                         Button("停止天气预览") { model.stopWeatherPreview() }
                         Text(model.weatherPreviewStatus).font(.caption).foregroundStyle(.secondary)
-                        Toggle("天气音效（雨声与雷声）", isOn: $model.desktopRainSound)
+                        Toggle("天气音效", isOn: $model.desktopRainSound)
+                        if model.desktopRainSound {
+                            HStack {
+                                Text("钢盆敲击声音量")
+                                Slider(value:$model.desktopRainBasinVolume,in:0...1)
+                                    .accessibilityLabel("钢盆敲击声音量")
+                                Text("\(Int(model.desktopRainBasinVolume*100))%")
+                                    .monospacedDigit().frame(width:42,alignment:.trailing)
+                            }
+                        }
                         Text("预览使用本地效果，无需联网，遵循天气音效开关与音量；下雪静音。关闭此窗口后恢复真实天气。小雨、中雨、大雨、雷雨会触发蓝鱼拿盆避雨。")
                             .font(.caption).foregroundStyle(.secondary)
                     }.frame(maxWidth: .infinity, alignment: .leading)

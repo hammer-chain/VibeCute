@@ -24,6 +24,18 @@ struct MenuPanelView: View {
         divider
         Toggle("显示字幕", isOn: $model.enabled)
         divider
+        Toggle("任务音效", isOn: $model.taskSoundsEnabled)
+          .accessibilityIdentifier("menu-task-sound")
+        volumeSlider("任务音量", value: Binding(
+          get: { model.taskSoundVolume / 3 }, set: { model.taskSoundVolume = $0 * 3 }),
+          enabled: model.taskSoundsEnabled, id: "menu-task-volume")
+        Toggle("天气音效", isOn: $model.desktopRainSound)
+          .accessibilityIdentifier("menu-weather-sound")
+        volumeSlider("雨声与雷声", value: $model.desktopRainVolume,
+          enabled: model.desktopRainSound, id: "menu-weather-volume")
+        volumeSlider("钢盆敲击声", value: $model.desktopRainBasinVolume,
+          enabled: model.desktopRainSound, id: "menu-basin-volume")
+        divider
         Text("Harness 与角色").fontWeight(.semibold)
         VStack(alignment: .leading, spacing: 10) {
           ForEach(SessionSource.allCases, id: \.preferenceID) { source in
@@ -50,7 +62,6 @@ struct MenuPanelView: View {
             ForEach(model.availableCharacters) { Text($0.title).tag($0) }
           }.pickerStyle(.menu).buttonStyle(.bordered)
         }
-        Toggle("任务音效", isOn: $model.taskSoundsEnabled)
         divider
         Button(action: onPreferences) {
           HStack {
@@ -86,6 +97,17 @@ struct MenuPanelView: View {
       .preferredColorScheme(.dark)
   }
   private var divider: some View { Rectangle().fill(CuteTheme.line).frame(height: 0.8) }
+  private func volumeSlider(_ title: String, value: Binding<Double>, enabled: Bool, id: String) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      HStack {
+        Text(title).foregroundStyle(.secondary)
+        Spacer()
+        Text("\(Int((value.wrappedValue * 100).rounded()))%")
+          .monospacedDigit().foregroundStyle(.secondary)
+      }.font(.caption)
+      Slider(value: value, in: 0...1).accessibilityLabel(title).accessibilityIdentifier(id)
+    }.disabled(!enabled)
+  }
 }
 
 private struct MenuContentHeight: PreferenceKey {

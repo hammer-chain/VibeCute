@@ -1,5 +1,6 @@
 import AppKit
 import QuartzCore
+import SwiftUI
 @testable import CodexCaptions
 
 @main struct BasinRainNativeChecks {
@@ -7,6 +8,24 @@ import QuartzCore
         _ = NSApplication.shared
         NSApp.setActivationPolicy(.accessory)
         guard let display = NSScreen.screens.first else { fatalError("Graphical session required") }
+        // Empty thunder frame must be transparent until a bolt appears.
+        // This catches a cloud overlay without depending on private draw methods.
+        let stormView = RainView(frame:NSRect(x:0,y:0,width:320,height:260),region:RainRect(x:0,y:0,width:320,height:260))
+        func hasVisibleWeather() -> Bool {
+            let image = stormView.bitmapImageRepForCachingDisplay(in:stormView.bounds)!
+            stormView.cacheDisplay(in:stormView.bounds,to:image)
+            for y in stride(from:0,to:image.pixelsHigh,by:4) {
+                for x in stride(from:0,to:image.pixelsWide,by:4) {
+                    if (image.colorAt(x:x,y:y)?.alphaComponent ?? 0) > 0 { return true }
+                }
+            }
+            return false
+        }
+        stormView.step(dt:0,field:RoofField(),enabled:true,settings:RainSettings(style:.thunder),weatherTime:0)
+        precondition(!hasVisibleWeather(),"Thunder preview still paints clouds")
+        let bolt = WeatherStormTiming.event(at:0).lightningAt
+        stormView.step(dt:0,field:RoofField(),enabled:true,settings:RainSettings(style:.thunder),weatherTime:bolt+0.1)
+        precondition(hasVisibleWeather(),"Cloud removal also removed lightning")
         let roof = RainBasinSurface(source:"deepseek",points:[RainPoint(x:80,y:170),RainPoint(x:160,y:140),RainPoint(x:240,y:170)],scale:1)!
         let vertical = roof.firstImpact(from:RainPoint(x:160,y:0),to:RainPoint(x:160,y:250))!
         precondition(abs(vertical.point.y-140) < 0.01 && vertical.normal.y < 0)
@@ -73,7 +92,7 @@ import QuartzCore
         // Real controller and AVAudioPlayer, controlled contact input. Volume 0
         // exercises decoding/playback without producing sound on the test device.
         let controller = DesktopRainController()
-        controller.configure(active:true,settings:RainSettings(),sound:true,volume:0)
+        controller.configure(active:true,settings:RainSettings(),sound:true,volume:0,basinVolume:0)
         var delivered = 0
         controller.onBasinImpact = { _,_ in delivered += 1 }
         let impact = RainBasinImpact(source:"deepseek",hit:vertical,scale:1)
@@ -84,9 +103,15 @@ import QuartzCore
         precondition(controller.basinSoundPlays == 1,"Per-drop audio bypassed 8Hz throttle")
         precondition(controller.diagnostics["basinVoices"] as? Int == 2)
         precondition(controller.audioDecodes == decodes,"Hits decoded repeated audio")
-        controller.configure(active:true,settings:RainSettings(),sound:false,volume:0)
+        RunLoop.main.run(until:Date().addingTimeInterval(0.3)) // Finish the silent one-shot before changing gain.
+        controller.configure(active:true,settings:RainSettings(),sound:true,volume:0,basinVolume:0.8)
+        RunLoop.main.run(until:Date().addingTimeInterval(0.15))
+        let gains = controller.diagnostics["basinVoiceVolumes"] as! [Double]
+        precondition(gains.count == 2 && gains.allSatisfy { abs($0-0.8)<0.01 },"Steel gain still follows rain volume")
+        precondition(controller.audioDecodes == decodes,"Steel volume slider recreated the audio pool")
+        controller.configure(active:true,settings:RainSettings(),sound:false,volume:0,basinVolume:0)
         precondition(controller.diagnostics["basinSoundPlaying"] as? Bool == false)
-        controller.configure(active:true,settings:RainSettings(style:.snow),sound:true,volume:0)
+        controller.configure(active:true,settings:RainSettings(style:.snow),sound:true,volume:0,basinVolume:0)
         controller.processBasinImpact(impact,at:now+2)
         precondition(controller.basinSoundPlays == 1,"Snow played steel rain sounds")
         controller.stop()
@@ -94,6 +119,30 @@ import QuartzCore
         controller.processBasinImpact(impact,at:now+3)
         precondition(delivered == before && controller.diagnostics["basinVoices"] as? Int == 0)
         actor.hide()
+        let suiteIndex = CommandLine.arguments.firstIndex(of:"--preferences-suite")!
+        let suite = CommandLine.arguments[suiteIndex+1], defaults = UserDefaults(suiteName:suite)!
+        defaults.removePersistentDomain(forName:suite)
+        defer { defaults.removePersistentDomain(forName:suite) }
+        let settingsModel = AppModel()
+        precondition(settingsModel.desktopRainBasinVolume == 0.6,"New steel volume default is not louder")
+        settingsModel.desktopRainBasinVolume = 0.78
+        precondition(abs(defaults.double(forKey:"desktopRainBasinVolume")-0.78)<0.001)
+        let reloaded = AppModel()
+        precondition(abs(reloaded.desktopRainBasinVolume-0.78)<0.001,"Steel volume did not survive preferences reload")
+        // Render this program's real SwiftUI menu, without capturing the desktop.
+        settingsModel.taskSoundsEnabled = true; settingsModel.taskSoundVolume = 1.5
+        settingsModel.desktopRainSound = true; settingsModel.desktopRainVolume = 0.35
+        let menu = NSHostingController(rootView:MenuPanelView(model:settingsModel,onPreferences:{},onOnboarding:{}))
+        let menuWindow = NSWindow(contentRect:NSRect(x:0,y:0,width:340,height:720),styleMask:[.borderless],backing:.buffered,defer:false)
+        menuWindow.contentViewController = menu; menuWindow.isReleasedWhenClosed = false
+        menuWindow.orderFrontRegardless()
+        RunLoop.main.run(until:Date().addingTimeInterval(0.25))
+        menu.view.layoutSubtreeIfNeeded()
+        let menuBitmap = menu.view.bitmapImageRepForCachingDisplay(in:menu.view.bounds)!
+        menu.view.cacheDisplay(in:menu.view.bounds,to:menuBitmap)
+        try FileManager.default.createDirectory(atPath:"output/basin-volume",withIntermediateDirectories:true)
+        try menuBitmap.representation(using:.png,properties:[:])!.write(to:URL(fileURLWithPath:"output/basin-volume/native-menu.png"))
+        menuWindow.orderOut(nil)
         let report: [String:Any] = ["actualSolverWetHits":wetHits,"coveredHits":0,"registeredPoseScaleFacingCases":registered,
             "particleLimit":64,"poolVoices":2,"audioPlaysFor101ContactsIn100ms":controller.basinSoundPlays,
             "decodeCountStableAcross100Contacts":true,"audioTestVolume":0,

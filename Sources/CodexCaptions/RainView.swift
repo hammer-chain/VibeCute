@@ -23,6 +23,22 @@ final class RainView: NSView {
     private var settings = RainSettings()
     private var enabled = true
     private var elapsed = 0.0
+    private var stormSeed: UInt64 = 0
+    private var lightningShape: WeatherLightningShape?
+    private var lightningKey: String?
+    // A shared 256 KiB halo, instead of shading full-screen gradients every flash.
+    private static let lightningGlow: CGImage? = {
+        let space = CGColorSpaceCreateDeviceRGB()
+        guard let bitmap = CGContext(data:nil,width:256,height:256,bitsPerComponent:8,bytesPerRow:0,
+            space:space,bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        let colors = [NSColor(calibratedRed:0.65,green:0.8,blue:1,alpha:0.24).cgColor,
+                      NSColor(calibratedRed:0.4,green:0.65,blue:1,alpha:0.07).cgColor,
+                      NSColor(calibratedRed:0.4,green:0.65,blue:1,alpha:0).cgColor] as CFArray
+        guard let glow = CGGradient(colorsSpace:space,colors:colors,locations:[0,0.35,1]) else { return nil }
+        bitmap.drawRadialGradient(glow,startCenter:CGPoint(x:128,y:128),startRadius:0,
+            endCenter:CGPoint(x:128,y:128),endRadius:128,options:[])
+        return bitmap.makeImage()
+    }()
     private var snowflakes: [Splash] = []
     private(set) var basinImpacts: [RainBasinImpact] = []
     private(set) var basinHits = 0
@@ -60,7 +76,8 @@ final class RainView: NSView {
     }
 
     func step(dt: Double, field: RoofField, enabled: Bool, settings: RainSettings, weatherTime: Double? = nil,
-              basins: [RainBasinSurface] = []) {
+              basins: [RainBasinSurface] = [], stormSeed: UInt64 = 0) {
+        self.stormSeed = stormSeed
         basinImpacts.removeAll(keepingCapacity:true)
         // Preserve particles during live slider drags. Every surviving drop is
         // checked against the new wind's backwards ray and updated size below;
@@ -158,7 +175,7 @@ final class RainView: NSView {
                                               width: flake.radius * 2, height: flake.radius * 2))
             }
             context.fillPath(); return
-        case .thunder: drawClouds(context); drawLightning(context)
+        case .thunder: drawLightning(context)
         case .rain: break
         }
         context.setLineWidth(CGFloat(settings.size))
@@ -199,29 +216,40 @@ final class RainView: NSView {
         }
     }
 
-    private func drawClouds(_ context: CGContext) {
-        context.setFillColor(NSColor(calibratedWhite: 0.34, alpha: 0.38).cgColor)
-        for index in 0..<4 {
-            let offset = (elapsed * 6 + Double(index) * Double(bounds.width) / 3)
-                .truncatingRemainder(dividingBy: Double(bounds.width) + 300) - 150
-            let y = Double(45 + (index % 2) * 60)
-            context.beginPath()
-            context.addEllipse(in: CGRect(x: offset, y: y+26, width: 130, height: 55))
-            context.addEllipse(in: CGRect(x: offset+55, y: y, width: 100, height: 85))
-            context.addEllipse(in: CGRect(x: offset+115, y: y+15, width: 115, height: 65))
-            context.addRect(CGRect(x: offset+55, y: y+40, width: 120, height: 38))
-            context.fillPath()
-        }
-    }
-
     private func drawLightning(_ context: CGContext) {
-        // A brief local bolt; all displays share the audio owner's clock.
-        guard WeatherStormTiming.showsLightning(at: elapsed) else { return }
-        let x = bounds.width * 0.68
-        context.setStrokeColor(NSColor(calibratedRed: 0.88, green: 0.94, blue: 1, alpha: 0.85).cgColor)
-        context.setLineWidth(3); context.setLineJoin(.round); context.beginPath()
-        context.move(to: CGPoint(x: x, y: 80)); context.addLine(to: CGPoint(x: x-34, y: 150))
-        context.addLine(to: CGPoint(x: x+4, y: 140)); context.addLine(to: CGPoint(x: x-27, y: 218))
-        context.strokePath()
+        guard WeatherStormTiming.showsLightning(at: elapsed, seed: stormSeed) else { return }
+        let event = WeatherStormTiming.event(at:elapsed,seed:stormSeed)
+        let key = "\(stormSeed)-\(event.cycle)"
+        if lightningKey != key {
+            lightningShape = WeatherLightningShape(seed:stormSeed,cycle:event.cycle); lightningKey = key
+        }
+        guard let shape = lightningShape else { return }
+        let age = elapsed-event.lightningAt
+        let pulse = age < 0.055 ? 1.0 : age < 0.10 ? 0.22 : age < 0.16 ? 0.95 : age < 0.21 ? 0.18 : 0.55
+        func point(_ p: RainPoint) -> CGPoint { CGPoint(x:p.x*bounds.width,y:p.y*bounds.height) }
+        context.saveGState(); defer { context.restoreGState() }
+        // Local illumination fades out around the bolt; no opaque full-screen wash.
+        if let glow = Self.lightningGlow {
+            context.setAlpha(pulse); context.interpolationQuality = .none
+            let radius = min(bounds.width,bounds.height)*0.5
+            let center = point(shape.trunk[9])
+            context.draw(glow,in:CGRect(x:center.x-radius,y:center.y-radius,width:radius*2,height:radius*2))
+            context.setAlpha(1)
+        }
+        func path(_ points: [RainPoint], width: CGFloat, alpha: Double, white: Bool = false) {
+            context.beginPath(); context.move(to:point(points[0]))
+            for p in points.dropFirst() { context.addLine(to:point(p)) }
+            context.setLineWidth(width); context.setLineJoin(.round); context.setLineCap(.round)
+            context.setStrokeColor(NSColor(calibratedRed:white ? 1 : 0.65,
+                green:white ? 1 : 0.82,blue:1,alpha:alpha*pulse).cgColor)
+            context.strokePath()
+        }
+        path(shape.trunk,width:18,alpha:0.07)
+        path(shape.trunk,width:8,alpha:0.23)
+        for branch in shape.branches {
+            path(branch,width:5,alpha:0.16); path(branch,width:1.25,alpha:0.85,white:true)
+        }
+        path(shape.trunk,width:3.5,alpha:0.95)
+        path(shape.trunk,width:1.6,alpha:1,white:true)
     }
 }

@@ -22,9 +22,32 @@ import QuartzCore
         }
         for code in [95,96,97,99] { let storm = try reading(code); precondition(storm.thunderstorm) }
         let normalRain = try reading(61); precondition(!normalRain.thunderstorm)
-        precondition(!WeatherStormTiming.showsLightning(at:0.9) && WeatherStormTiming.showsLightning(at:1.1))
-        precondition(WeatherStormTiming.soundCycle(at:1.28) == nil && WeatherStormTiming.soundCycle(at:1.55) == 0)
-        precondition(WeatherStormTiming.soundCycle(at:13.55) == 1)
+        var intervals = Set<Int>(), gains = Set<Int>(), delays = Set<Int>(), shapes = Set<String>()
+        for seed: UInt64 in [0,42,.max] {
+            var previousBolt: Double?
+            for cycle in 0..<200 {
+                let event = WeatherStormTiming.event(at:Double(cycle)*12,seed:seed)
+                precondition(event.cycle == cycle)
+                precondition(event.lightningAt >= Double(cycle)*12+1 && event.lightningAt < Double(cycle)*12+5)
+                precondition((0.45...1.5).contains(event.soundAt-event.lightningAt))
+                precondition((0.65...1).contains(event.gain))
+                precondition(WeatherStormTiming.showsLightning(at:event.lightningAt+0.1,seed:seed))
+                precondition(!WeatherStormTiming.showsLightning(at:event.lightningAt-0.01,seed:seed))
+                precondition(WeatherStormTiming.soundCycle(at:event.soundAt-0.01,seed:seed) == nil)
+                precondition(WeatherStormTiming.soundCycle(at:event.soundAt+0.01,seed:seed) == cycle)
+                if let previousBolt { intervals.insert(Int((event.lightningAt-previousBolt)*1000)) }
+                previousBolt = event.lightningAt
+                gains.insert(Int(event.gain*1000)); delays.insert(Int((event.soundAt-event.lightningAt)*1000))
+                let shape = WeatherLightningShape(seed:seed,cycle:cycle)
+                let same = WeatherLightningShape(seed:seed,cycle:cycle)
+                precondition(shape.trunk.count == 19 && (3...6).contains(shape.branches.count))
+                precondition(shape.branches.allSatisfy { $0.count == 6 })
+                precondition(zip(shape.trunk,same.trunk).allSatisfy { $0.x == $1.x && $0.y == $1.y },"Bolt geometry changed between draws")
+                shapes.insert(shape.trunk.map { "\($0.x),\($0.y)" }.joined(separator:";"))
+            }
+        }
+        precondition(intervals.count > 100 && gains.count > 100 && delays.count > 100 && shapes.count == 600,
+                     "Storm events still repeat identically")
         for (code, amount, age) in [(61,0.0,1801.0),(61,0.0,-301.0),(100,0.0,0.0),(0,-1.0,0.0)] {
             do { _ = try reading(code, rain: amount, age: age); fatalError("Invalid or stale reading accepted") } catch {}
         }
@@ -61,6 +84,7 @@ import QuartzCore
         defaults.set([], forKey: "trackedHarnesses"); defaults.set(true, forKey: "claudeTrackingMigrated")
         defaults.set(true, forKey: "doubaoTrackingMigrated"); defaults.set(false, forKey: "autoAvoidanceEnabled")
         defaults.set(false, forKey: "audioEnabled"); defaults.set(false, forKey: "autoWindowPeekEnabled")
+        defaults.set(0,forKey:"desktopRainBasinVolume") // Independent steel gain must also stay silent.
         var appWet = false, appThunder = false
         let appWeather = RainWeatherMonitor { _ in RainWeatherReading(raining: appWet, date: Date(), thunderstorm:appThunder) }
         let model = AppModel(rainWeather: appWeather)
@@ -90,7 +114,9 @@ import QuartzCore
         precondition(model.desktopRainDiagnostics["audioDecodes"] as! Int == decoded,"Slider updates repeatedly decoded audio")
         wait(0.65)
         precondition(model.desktopRainDiagnostics["thunderPlays"] as? Int == 0,"Thunder sounded before lightning")
-        wait(1.1)
+        let due = model.desktopRainDiagnostics["thunderAt"] as! Double
+        let elapsed = model.desktopRainDiagnostics["weatherElapsed"] as! Double
+        wait(max(0,due-elapsed)+0.2)
         precondition(model.desktopRainDiagnostics["thunderPlaying"] as? Bool == true)
         precondition(model.desktopRainDiagnostics["thunderPlays"] as? Int == 1,"Thunder was multiplied by redraws/displays")
         NSWorkspace.shared.notificationCenter.post(name: NSWorkspace.screensDidSleepNotification, object: nil)
@@ -127,6 +153,10 @@ import QuartzCore
             let view = RainView(frame: NSRect(x: 0, y: 0, width: 960, height: 600),
                                 region: RainRect(x: 0, y: 0, width: 960, height: 600))
             for _ in 0..<216 { view.step(dt: 1/30, field: RoofField(), enabled: true, settings: preview.settings) }
+            if preview == .thunder {
+                view.step(dt:0,field:RoofField(),enabled:true,settings:preview.settings,
+                          weatherTime:WeatherStormTiming.event(at:0).lightningAt+0.025)
+            }
             guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { fatalError("No weather bitmap") }
             view.cacheDisplay(in: view.bounds, to: bitmap)
             try bitmap.representation(using: .png, properties: [:])!.write(to:

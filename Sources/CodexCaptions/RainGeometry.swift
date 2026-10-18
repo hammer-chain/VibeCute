@@ -141,13 +141,69 @@ enum DesktopWeatherStyle: String { case rain, snow, thunder }
 /// rumble follows each local bolt; neither display count nor redraws multiply it.
 enum WeatherStormTiming {
     static let period = 12.0
-    static func showsLightning(at time: Double) -> Bool {
-        let phase = time.truncatingRemainder(dividingBy: period)
-        return phase >= 1 && phase < 1.28
+    struct Event {
+        var cycle: Int
+        var lightningAt: Double
+        var soundAt: Double
+        var gain: Double
     }
-    static func soundCycle(at time: Double) -> Int? {
-        guard time.isFinite, time >= 1.55 else { return nil }
-        return Int((time-1.55)/period)
+    // Stateless seeded samples: every display and sound use exactly the same event.
+    // Keep each bolt + delayed rumble within its slot, with no catch-up backlog.
+    static func event(at time: Double, seed: UInt64 = 0) -> Event {
+        let cycle = Int(max(0, time.isFinite ? time : 0) / period)
+        func sample(_ lane: UInt64) -> Double {
+            var x = seed &+ UInt64(cycle) &* 0x9e3779b97f4a7c15 &+ lane
+            x = (x ^ (x >> 30)) &* 0xbf58476d1ce4e5b9
+            x = (x ^ (x >> 27)) &* 0x94d049bb133111eb
+            x ^= x >> 31
+            return Double(x >> 11) / 9007199254740992
+        }
+        let bolt = Double(cycle) * period + 1 + sample(1) * 4
+        return Event(cycle: cycle, lightningAt: bolt, soundAt: bolt + 0.45 + sample(2) * 1.05,
+                     gain: 0.65 + sample(3) * 0.35)
+    }
+    static func showsLightning(at time: Double, seed: UInt64 = 0) -> Bool {
+        let event = event(at: time, seed: seed)
+        return time >= event.lightningAt && time < event.lightningAt + 0.28
+    }
+    static func soundCycle(at time: Double, seed: UInt64 = 0) -> Int? {
+        let event = event(at: time, seed: seed)
+        return time >= event.soundAt ? event.cycle : nil
+    }
+}
+
+/// Fixed-size normalized geometry, generated once per bolt, never per draw.
+struct WeatherLightningShape {
+    var trunk: [RainPoint]
+    var branches: [[RainPoint]]
+    init(seed: UInt64, cycle: Int) {
+        var state = seed &+ UInt64(cycle) &* 0x9e3779b97f4a7c15
+        func random() -> Double {
+            state &+= 0x9e3779b97f4a7c15
+            var x = state
+            x = (x ^ (x >> 30)) &* 0xbf58476d1ce4e5b9
+            x = (x ^ (x >> 27)) &* 0x94d049bb133111eb
+            return Double((x ^ (x >> 31)) >> 11) / 9007199254740992
+        }
+        let startX = 0.2 + random()*0.6, startY = 0.02 + random()*0.1
+        let length = 0.4 + random()*0.45, drift = (random()-0.5)*0.55
+        trunk = (0...18).map { i in
+            let t = Double(i)/18
+            return RainPoint(x:min(0.95,max(0.05,startX+drift*t+(i == 0 ? 0 : (random()-0.5)*0.065))),
+                             y:startY+length*t)
+        }
+        branches = []
+        let count = 3 + Int(random()*4)
+        for branch in 0..<count {
+            let root = trunk[3 + branch*2 + Int(random()*2)]
+            let direction = random() < 0.5 ? -1.0 : 1.0
+            let reach = 0.08 + random()*0.16
+            branches.append((0...5).map { i in
+                let t = Double(i)/5
+                return RainPoint(x:root.x+direction*reach*t+(i == 0 ? 0 : (random()-0.5)*0.035),
+                                 y:root.y+t*(0.08+reach*0.45))
+            })
+        }
     }
 }
 
