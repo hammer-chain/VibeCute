@@ -27,6 +27,22 @@ struct DeveloperSettingsView: View {
                         Text(model.weatherPreviewStatus).font(.caption).foregroundStyle(.secondary)
                         Toggle("天气音效", isOn: $model.desktopRainSound)
                         if model.desktopRainSound {
+                            Text(model.rainAudioMappingLabel).font(.caption).foregroundStyle(.secondary)
+                            HStack {
+                                Text("远处雨声音量")
+                                Slider(value:$model.desktopRainVolume,in:0...1).accessibilityLabel("远处雨声音量")
+                                Text("\(Int(model.desktopRainVolume*100))%").monospacedDigit().frame(width:42,alignment:.trailing)
+                            }
+                            HStack {
+                                Text("近处雨滴音量")
+                                Slider(value:$model.desktopRainDropsVolume,in:0...1).accessibilityLabel("近处雨滴音量")
+                                Text("\(Int(model.desktopRainDropsVolume*100))%").monospacedDigit().frame(width:42,alignment:.trailing)
+                            }
+                            HStack {
+                                Text("雷声音量")
+                                Slider(value:$model.desktopRainThunderVolume,in:0...1).accessibilityLabel("雷声音量")
+                                Text("\(Int(model.desktopRainThunderVolume*100))%").monospacedDigit().frame(width:42,alignment:.trailing)
+                            }
                             HStack {
                                 Text("钢盆敲击声音量")
                                 Slider(value:$model.desktopRainBasinVolume,in:0...1)

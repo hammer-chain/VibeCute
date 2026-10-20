@@ -140,7 +140,7 @@ enum DesktopWeatherStyle: String { case rain, snow, thunder }
 /// One clock shared by every display and the single audio owner. A distant
 /// rumble follows each local bolt; neither display count nor redraws multiply it.
 enum WeatherStormTiming {
-    static let period = 12.0
+    static let period = 24.0
     struct Event {
         var cycle: Int
         var lightningAt: Double
@@ -169,6 +169,23 @@ enum WeatherStormTiming {
     static func soundCycle(at time: Double, seed: UInt64 = 0) -> Int? {
         let event = event(at: time, seed: seed)
         return time >= event.soundAt ? event.cycle : nil
+    }
+}
+
+/// A shuffled bag plays each recording once before refilling. Avoid the same
+/// recording at the boundary of two bags as well as inside a bag.
+struct WeatherThunderDeck {
+    static let resources = ["thunder", "thunder-soft", "thunder-roll", "thunder-double"]
+    private var remaining: [Int] = []
+    private var previous: Int?
+    mutating func next() -> Int {
+        if remaining.isEmpty {
+            remaining = Array(Self.resources.indices).shuffled()
+            if remaining.last == previous { remaining.swapAt(0,remaining.count-1) }
+        }
+        let index = remaining.removeLast()
+        previous = index
+        return index
     }
 }
 
@@ -221,12 +238,29 @@ enum DesktopWeatherPreview: String, CaseIterable, Identifiable {
     }
 }
 
+enum RainIntensity: String, CaseIterable {
+    case light = "小雨", moderate = "中雨", heavy = "大雨"
+    var soundCeiling: Double {
+        switch self { case .light: return 0.35; case .moderate: return 0.65; case .heavy: return 1 }
+    }
+    static func forQuantity(_ quantity: Double) -> Self {
+        guard quantity.isFinite else { return .moderate }
+        return quantity < 0.75 ? .light : quantity >= 1.8 ? .heavy : .moderate
+    }
+}
+
 struct RainSettings: Equatable {
     var size = 1.0
     var speed = 1.0
     var wind = 0.0 // Horizontal / vertical velocity; positive means blowing right.
     var quantity = 1.0
     var style: DesktopWeatherStyle = .rain
+    var intensity: RainIntensity? = nil
+    var soundIntensity: RainIntensity { intensity ?? RainIntensity.forQuantity(quantity) }
+    var rainSoundCeiling: Double { style == .snow ? 0 : soundIntensity.soundCeiling }
+    func rainOutput(userVolume: Double) -> Double {
+        (userVolume.isFinite ? min(1,max(0,userVolume)) : 0) * rainSoundCeiling
+    }
 }
 
 func quartzRect(appKit rect: RainRect, mainDisplayTop: Double) -> RainRect {

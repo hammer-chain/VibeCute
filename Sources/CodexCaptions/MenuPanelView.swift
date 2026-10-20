@@ -31,8 +31,13 @@ struct MenuPanelView: View {
           enabled: model.taskSoundsEnabled, id: "menu-task-volume")
         Toggle("天气音效", isOn: $model.desktopRainSound)
           .accessibilityIdentifier("menu-weather-sound")
-        volumeSlider("雨声与雷声", value: $model.desktopRainVolume,
+        volumeSlider("远处雨声", value: $model.desktopRainVolume,
           enabled: model.desktopRainSound, id: "menu-weather-volume")
+        volumeSlider("近处雨滴", value: $model.desktopRainDropsVolume,
+          enabled: model.desktopRainSound, id: "menu-rain-drops-volume")
+        Text(model.rainAudioMappingLabel).font(.caption2).foregroundStyle(.secondary)
+        volumeSlider("雷声", value: $model.desktopRainThunderVolume,
+          enabled: model.desktopRainSound, id: "menu-thunder-volume")
         volumeSlider("钢盆敲击声", value: $model.desktopRainBasinVolume,
           enabled: model.desktopRainSound, id: "menu-basin-volume")
         divider

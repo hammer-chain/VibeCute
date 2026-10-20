@@ -339,13 +339,18 @@ struct SettingsView: View {
                     valueText: String(format: "%.2f×", model.desktopRainQuantity))
       Toggle("天气音效", isOn: $model.desktopRainSound)
       if model.desktopRainSound {
+        Text(model.rainAudioMappingLabel).font(.caption).foregroundStyle(.secondary)
         Text(model.rainSoundStatus).font(.caption).foregroundStyle(.secondary)
-        settingSlider("雨声与雷声音量", value: $model.desktopRainVolume, range: 0...1,
+        settingSlider("远处雨声音量", value: $model.desktopRainVolume, range: 0...1,
                       valueText: "\(Int(model.desktopRainVolume * 100))%")
+        settingSlider("近处雨滴音量", value: $model.desktopRainDropsVolume, range: 0...1,
+                      valueText: "\(Int(model.desktopRainDropsVolume * 100))%")
+        settingSlider("雷声音量", value: $model.desktopRainThunderVolume, range: 0...1,
+                      valueText: "\(Int(model.desktopRainThunderVolume * 100))%")
         settingSlider("钢盆敲击声音量", value: $model.desktopRainBasinVolume, range: 0...1,
                       valueText: "\(Int(model.desktopRainBasinVolume * 100))%")
       }
-      Text("下雨循环播放雨声，雷雨在闪电后响起雷声；晴天、阴天不显示效果。关闭后停止动画和音效。")
+      Text("远处雨声与近处雨滴独立循环，可分别调节音量；雷雨在闪电后响起雷声；晴天、阴天不显示效果。关闭后停止动画和音效。")
         .font(.caption).foregroundStyle(.secondary)
     }
   }

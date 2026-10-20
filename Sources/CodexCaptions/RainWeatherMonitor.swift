@@ -15,6 +15,7 @@ struct RainWeatherReading {
     let raining: Bool
     let date: Date
     var thunderstorm = false
+    var intensity: RainIntensity = .moderate
     func isFresh(at now: Date) -> Bool {
         let age = now.timeIntervalSince(date)
         return age >= -300 && age <= 1800
@@ -73,9 +74,17 @@ enum RainWeatherClient {
         // Current codes/amounts only. Snow/fog and forecast probabilities do not trigger rain.
         let rainCodes = [51,53,55,56,57,61,63,65,66,67,80,81,82,95,96,97,99]
         let fairWeather = (0...3).contains(current.weather_code)
+        // Sound profiles follow current weather codes, not a precipitation sum
+        // whose interval can vary. Drizzle uses the quiet/light profile.
+        let intensity: RainIntensity
+        switch current.weather_code {
+        case 51,53,55,56,57,61,66,80: intensity = .light
+        case 65,67,82,97,99: intensity = .heavy
+        default: intensity = .moderate
+        }
         let reading = RainWeatherReading(raining: !fairWeather && (rainCodes.contains(current.weather_code) || current.rain + current.showers > 0),
                                          date: Date(timeIntervalSince1970: current.time),
-                                         thunderstorm: [95,96,97,99].contains(current.weather_code))
+                                         thunderstorm: [95,96,97,99].contains(current.weather_code), intensity:intensity)
         guard reading.isFresh(at: now) else { throw RainWeatherError.stale }
         return reading
     }
@@ -93,6 +102,7 @@ final class RainWeatherMonitor {
     private var lastAttempt = Date.distantPast
     private var reading: RainWeatherReading?
     var thunderstormActive: Bool { reading.map { $0.isFresh(at: Date()) && $0.thunderstorm } ?? false }
+    var intensityActive: RainIntensity { reading.flatMap { $0.isFresh(at:Date()) ? $0.intensity : nil } ?? .moderate }
     private(set) var requestCount = 0
     private var wakeObserver: NSObjectProtocol?
     private let fetch: (RainCity) async throws -> RainWeatherReading
@@ -148,6 +158,6 @@ final class RainWeatherMonitor {
     var diagnostics: [String: Any] {
         ["enabled": city != nil, "requests": requestCount, "polling": timer != nil,
          "inFlight": request != nil, "raining": reading?.raining ?? false,
-         "thunderstorm": thunderstormActive, "provider": "Open-Meteo"]
+         "thunderstorm": thunderstormActive, "rainIntensity":intensityActive.rawValue, "provider": "Open-Meteo"]
     }
 }

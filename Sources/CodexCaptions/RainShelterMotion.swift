@@ -8,23 +8,39 @@ enum RainShelterRoute: Equatable {
 }
 
 enum RainShelterPlanner {
+    /// AppKit artwork bounds against the existing Quartz window snapshot.
+    /// A rain shadow below a window or a partial overlap is not containment.
+    static func isInsideWindow(body: CGRect, windows: [RainRect], displayTop: Double) -> Bool {
+        guard !body.isEmpty, !body.isNull else { return false }
+        return windows.contains { window in
+            CGRect(x:window.x,y:displayTop-window.maxY,width:window.width,height:window.height).contains(body)
+        }
+    }
+
     static func route(origin: CGPoint, anchor: CGPoint, body: CGRect, allowed: CGRect,
-                      window: CGRect?, wind: Double, scale: Double) -> RainShelterRoute {
+                      window: CGRect?, wind: Double, scale: Double, windows: [CGRect] = []) -> RainShelterRoute {
         func clamp(_ x: Double, _ lo: Double, _ hi: Double) -> Double { min(hi, max(lo, x)) }
         guard !allowed.isNull, allowed.width >= 0, allowed.height >= 0 else {
             return .pace(minX: origin.x, maxX: origin.x, y: origin.y)
         }
         let margin = 8 * scale
-        if let window, window.width > 1, window.height > 1, wind.isFinite {
-            // Erode by the whole artwork envelope, then always use the window's
-            // bottom inside edge. If that edge is off-screen, pace locally.
+        func destination(in window: CGRect) -> CGPoint? {
+            guard window.width > 1, window.height > 1, wind.isFinite else { return nil }
+            // Intersect the window's full-body interior with the legal group
+            // origins (including caption/screen constraints), not just one edge.
             let loX = max(allowed.minX,window.minX+margin-body.minX)
             let hiX = min(allowed.maxX,window.maxX-margin-body.maxX)
             let bottomY = window.minY+margin-body.minY
+            let loY = max(allowed.minY,bottomY)
             let hiY = min(allowed.maxY,window.maxY-margin-body.maxY)
-            if loX <= hiX && allowed.minY <= bottomY && bottomY <= hiY {
-                return .shelter(CGPoint(x:clamp(origin.x,loX,hiX),y:bottomY))
-            }
+            guard loX <= hiX, loY <= hiY else { return nil }
+            let y = (loY...hiY).contains(bottomY) ? bottomY : clamp(origin.y,loY,hiY)
+            return CGPoint(x:clamp(origin.x,loX,hiX),y:y)
+        }
+        if let window, let point = destination(in:window) { return .shelter(point) }
+        for candidate in windows {
+            if let window, candidate == window { continue }
+            if let point = destination(in:candidate) { return .shelter(point) }
         }
         let center = clamp(anchor.x,allowed.minX,allowed.maxX)
         return .pace(minX:max(allowed.minX,center-56*scale),

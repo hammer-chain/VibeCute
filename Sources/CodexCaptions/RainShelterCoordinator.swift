@@ -17,6 +17,7 @@ final class RainShelterCoordinator {
     }
     private let overlays: ProjectOverlays
     private var actors: [CaptionMascot: Actor] = [:]
+    private var alreadyInside: Set<CaptionMascot> = []
     private var cooldown: [CaptionMascot: Double] = [:]
     private var lastTick = -Double.infinity
     private(set) var plans = 0
@@ -41,12 +42,14 @@ final class RainShelterCoordinator {
         if actors[source]?.controlling == true { overlays.endBackdropRelocation(for:source) }
         overlays.clearRainShelter(for:source); actors.removeValue(forKey:source)
     }
-    func stopAll() { for source in Array(actors.keys) { stop(source) } }
+    func stopAll() { for source in Array(actors.keys) { stop(source) }; alreadyInside.removeAll() }
     func update(_ snapshot: RainShelterSnapshot, enabled: Bool, at now: Double) {
         guard enabled, !snapshot.suspended else { stopAll(); return }
+        if !snapshot.raining { alreadyInside.removeAll() }
         guard snapshot.raining || !actors.isEmpty else { return }
         let slot = floor(now*30)
         guard slot > lastTick else { return }; lastTick = slot; ticks += 1
+        alreadyInside.removeAll()
         let visible = overlays.rainShelterActors
         let present = Set(visible.map(\.source))
         for source in Array(actors.keys) where !present.contains(source) { stop(source) }
@@ -58,6 +61,18 @@ final class RainShelterCoordinator {
                 stop(source); cooldown[source] = now+3; continue
             }
             guard now >= cooldown[source,default:0] else { continue }
+            // Do not start (or restart) an action while the complete character
+            // is already in any ordinary window, regardless of frontmost order.
+            // Finish an action already in progress so its stow animation survives.
+            if snapshot.raining, actors[source] == nil || actors[source]?.motion.phase == .sheltered,
+               let main = NSScreen.screens.first {
+                let body = DeepSeekRainArtwork.body(in:character.subtitle.bounds,
+                    scale:Double(character.subtitle.layoutScale)).offsetBy(dx:character.panel.frame.minX,dy:character.panel.frame.minY)
+                let windows = snapshot.windows.isEmpty ? snapshot.frontWindow.map { [$0] } ?? [] : snapshot.windows
+                if RainShelterPlanner.isInsideWindow(body:body,windows:windows,displayTop:main.frame.maxY) {
+                    alreadyInside.insert(source); continue
+                }
+            }
             if actors[source] == nil {
                 guard snapshot.raining, DeepSeekRainArtwork.shared.available else { continue }
                 let origin = character.panel.frame.origin
@@ -79,8 +94,12 @@ final class RainShelterCoordinator {
                     guard let main = NSScreen.screens.first else { return nil }
                     return CGRect(x:roof.x,y:main.frame.maxY-roof.maxY,width:roof.width,height:roof.height)
                 }
+                let otherWindows: [CGRect] = snapshot.windows.compactMap { roof in
+                    guard let main = NSScreen.screens.first else { return nil }
+                    return CGRect(x:roof.x,y:main.frame.maxY-roof.maxY,width:roof.width,height:roof.height)
+                }
                 actor.route = RainShelterPlanner.route(origin:actor.motion.origin,anchor:actor.fallbackAnchor ?? actor.motion.origin,
-                    body:body,allowed:allowed,window:window,wind:snapshot.wind,scale:scale)
+                    body:body,allowed:allowed,window:window,wind:snapshot.wind,scale:scale,windows:otherWindows)
                 if case .pace = actor.route {
                     if actor.fallbackAnchor == nil { actor.fallbackAnchor = actor.motion.origin }
                 } else { actor.fallbackAnchor = nil }
@@ -102,6 +121,6 @@ final class RainShelterCoordinator {
             ["source":source.rawValue,"phase":actor.motion.phase.rawValue,
              "x":actor.motion.origin.x,"y":actor.motion.origin.y,
              "fallback":{ if case .pace = actor.route { return true }; return false }()] as [String:Any]
-        },"plans":plans,"ticks":ticks,"windowQueries":0,"maxMovementHz":30,"maxPlanningHzPerActor":2]
+        },"alreadyInsideWindow":alreadyInside.map(\.rawValue).sorted(),"plans":plans,"ticks":ticks,"windowQueries":0,"maxMovementHz":30,"maxPlanningHzPerActor":2]
     }
 }

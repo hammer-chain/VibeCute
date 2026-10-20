@@ -22,8 +22,12 @@
   ],
   "resource_files": [
     "LipVowels.json",
-    "rain.wav",
+    "rain-bed-loop.wav",
+    "rain-drops-loop.wav",
     "thunder.wav",
+    "thunder-soft.wav",
+    "thunder-roll.wav",
+    "thunder-double.wav",
     "basin-hit.wav"
   ],
   "excluded_resources": [

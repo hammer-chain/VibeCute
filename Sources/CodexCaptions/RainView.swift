@@ -18,6 +18,8 @@ final class RainView: NSView {
     let region: RainRect
     private var drops: [Drop] = []
     private var splashes: [Splash] = []
+    private var footRipples: [RainFootRipple] = []
+    private var rippleTime = 0.0
     private var birthBudget = 0.0
     private var field = RoofField()
     private var settings = RainSettings()
@@ -52,6 +54,7 @@ final class RainView: NSView {
 
     func clear() {
         basinImpacts.removeAll(keepingCapacity:true)
+        footRipples.removeAll()
         drops.removeAll()
         splashes.removeAll()
         birthBudget = 0
@@ -76,7 +79,7 @@ final class RainView: NSView {
     }
 
     func step(dt: Double, field: RoofField, enabled: Bool, settings: RainSettings, weatherTime: Double? = nil,
-              basins: [RainBasinSurface] = [], stormSeed: UInt64 = 0) {
+              footRipples: [RainFootRipple] = [], rippleTime: Double = 0, basins: [RainBasinSurface] = [], stormSeed: UInt64 = 0) {
         self.stormSeed = stormSeed
         basinImpacts.removeAll(keepingCapacity:true)
         // Preserve particles during live slider drags. Every surviving drop is
@@ -87,6 +90,8 @@ final class RainView: NSView {
         self.field = field
         self.enabled = enabled
         guard enabled else { clear(); return }
+        self.footRipples = Array(footRipples.prefix(32))
+        self.rippleTime = rippleTime
         elapsed = weatherTime ?? (elapsed + dt)
         if settings.style == .snow {
             stepSnow(dt: dt, field: field); needsDisplay = true; return
@@ -178,6 +183,7 @@ final class RainView: NSView {
         case .thunder: drawLightning(context)
         case .rain: break
         }
+        drawFootRipples(context)
         context.setLineWidth(CGFloat(settings.size))
         context.setLineCap(.round)
         context.setStrokeColor(NSColor(calibratedRed: 0.62, green: 0.79, blue: 0.96, alpha: 0.48).cgColor)
@@ -194,6 +200,38 @@ final class RainView: NSView {
             context.setFillColor(NSColor(calibratedRed: 0.72, green: 0.86, blue: 1, alpha: 0.65 * splash.life / 0.35).cgColor)
             context.fillEllipse(in: CGRect(x: splash.point.x - region.x - splash.radius,
                 y: splash.point.y - region.y - splash.radius, width: splash.radius * 2, height: splash.radius * 2))
+        }
+    }
+
+    private func drawFootRipples(_ context: CGContext) {
+        guard !footRipples.isEmpty else { return }
+        context.saveGState(); defer { context.restoreGState() }
+        // Subtract each window separately; overlapping windows must not cancel
+        // their masks as they would in one combined even-odd path.
+        for window in field.windows {
+            guard footRipples.contains(where: { ring in
+                let r = 42*ring.scale
+                return ring.point.x+r >= window.x && ring.point.x-r <= window.maxX &&
+                    ring.point.y+r*0.32 >= window.y && ring.point.y-r*0.32 <= window.maxY
+            }) else { continue }
+            context.beginPath(); context.addRect(bounds)
+            context.addRect(CGRect(x:window.x-region.x,y:window.y-region.y,width:window.width,height:window.height))
+            context.clip(using:.evenOdd)
+        }
+        for ring in footRipples {
+            let age = rippleTime-ring.birth
+            guard age >= 0, age < RainFootRipple.lifetime else { continue }
+            for delay in [0.0,0.15] {
+                let t = age-delay
+                guard t >= 0 else { continue }
+                let progress = min(1,t/RainFootRipple.lifetime)
+                let radius = (3+35*sqrt(progress))*ring.scale
+                let alpha = 0.38*pow(1-progress,1.6)*(delay == 0 ? 1 : 0.65)
+                context.setStrokeColor(NSColor(calibratedRed:0.65,green:0.86,blue:1,alpha:alpha).cgColor)
+                context.setLineWidth(max(0.6,1.15*ring.scale*(1-progress*0.5)))
+                context.strokeEllipse(in:CGRect(x:ring.point.x-region.x-radius,y:ring.point.y-region.y-radius*0.32,
+                    width:radius*2,height:radius*0.64))
+            }
         }
     }
 

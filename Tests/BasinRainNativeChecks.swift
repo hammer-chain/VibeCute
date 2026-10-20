@@ -92,7 +92,7 @@ import SwiftUI
         // Real controller and AVAudioPlayer, controlled contact input. Volume 0
         // exercises decoding/playback without producing sound on the test device.
         let controller = DesktopRainController()
-        controller.configure(active:true,settings:RainSettings(),sound:true,volume:0,basinVolume:0)
+        controller.configure(active:true,settings:RainSettings(),sound:true,volume:0,dropsVolume:0,thunderVolume:0,basinVolume:0)
         var delivered = 0
         controller.onBasinImpact = { _,_ in delivered += 1 }
         let impact = RainBasinImpact(source:"deepseek",hit:vertical,scale:1)
@@ -104,14 +104,14 @@ import SwiftUI
         precondition(controller.diagnostics["basinVoices"] as? Int == 2)
         precondition(controller.audioDecodes == decodes,"Hits decoded repeated audio")
         RunLoop.main.run(until:Date().addingTimeInterval(0.3)) // Finish the silent one-shot before changing gain.
-        controller.configure(active:true,settings:RainSettings(),sound:true,volume:0,basinVolume:0.8)
+        controller.configure(active:true,settings:RainSettings(),sound:true,volume:0,dropsVolume:0,thunderVolume:0,basinVolume:0.8)
         RunLoop.main.run(until:Date().addingTimeInterval(0.15))
         let gains = controller.diagnostics["basinVoiceVolumes"] as! [Double]
         precondition(gains.count == 2 && gains.allSatisfy { abs($0-0.8)<0.01 },"Steel gain still follows rain volume")
         precondition(controller.audioDecodes == decodes,"Steel volume slider recreated the audio pool")
         controller.configure(active:true,settings:RainSettings(),sound:false,volume:0,basinVolume:0)
         precondition(controller.diagnostics["basinSoundPlaying"] as? Bool == false)
-        controller.configure(active:true,settings:RainSettings(style:.snow),sound:true,volume:0,basinVolume:0)
+        controller.configure(active:true,settings:RainSettings(style:.snow),sound:true,volume:0,dropsVolume:0,thunderVolume:0,basinVolume:0)
         controller.processBasinImpact(impact,at:now+2)
         precondition(controller.basinSoundPlays == 1,"Snow played steel rain sounds")
         controller.stop()
@@ -125,10 +125,14 @@ import SwiftUI
         defer { defaults.removePersistentDomain(forName:suite) }
         let settingsModel = AppModel()
         precondition(settingsModel.desktopRainBasinVolume == 0.6,"New steel volume default is not louder")
+        precondition(settingsModel.desktopRainVolume == 0.15 && settingsModel.desktopRainDropsVolume == 0.45)
+        settingsModel.desktopRainDropsVolume = 0.28
+        settingsModel.desktopRainThunderVolume = 0.32
         settingsModel.desktopRainBasinVolume = 0.78
         precondition(abs(defaults.double(forKey:"desktopRainBasinVolume")-0.78)<0.001)
         let reloaded = AppModel()
         precondition(abs(reloaded.desktopRainBasinVolume-0.78)<0.001,"Steel volume did not survive preferences reload")
+        precondition(abs(reloaded.desktopRainDropsVolume-0.28)<0.001 && abs(reloaded.desktopRainThunderVolume-0.32)<0.001)
         // Render this program's real SwiftUI menu, without capturing the desktop.
         settingsModel.taskSoundsEnabled = true; settingsModel.taskSoundVolume = 1.5
         settingsModel.desktopRainSound = true; settingsModel.desktopRainVolume = 0.35
@@ -143,6 +147,86 @@ import SwiftUI
         try FileManager.default.createDirectory(atPath:"output/basin-volume",withIntermediateDirectories:true)
         try menuBitmap.representation(using:.png,properties:[:])!.write(to:URL(fileURLWithPath:"output/basin-volume/native-menu.png"))
         menuWindow.orderOut(nil)
+        // Wet movement emits bounded world-space rings; stationary, dry and
+        // teleporting actors do not leave trails.
+        var ripples = RainFootRipples()
+        let wetField = RoofField()
+        func feet(_ x: Double) -> [RainFootprint] {
+            [RainFootprint(source:"test",point:RainPoint(x:x,y:260),scale:1)]
+        }
+        ripples.advance(at:0,feet:feet(100),field:wetField,wind:0)
+        for i in 1...60 { ripples.advance(at:Double(i)/30,feet:feet(100+Double(i)*4.3),field:wetField,wind:0) }
+        precondition(ripples.emitted > 4 && ripples.rings.count <= 5)
+        let count = ripples.emitted
+        for i in 61...100 { ripples.advance(at:Double(i)/30,feet:feet(358),field:wetField,wind:0) }
+        precondition(ripples.emitted == count && ripples.rings.isEmpty,"Stationary actor kept producing ripples")
+        let covered = RoofField(windows:[RainRect(x:0,y:0,width:800,height:300)])
+        for i in 101...130 { ripples.advance(at:Double(i)/30,feet:feet(358+Double(i-100)*4),field:covered,wind:0) }
+        precondition(ripples.emitted == count && ripples.rings.isEmpty,"Window-covered movement made ripples")
+        ripples.advance(at:5,feet:feet(1500),field:wetField,wind:0)
+        precondition(ripples.emitted == count,"Teleport produced a footstep")
+        // Sixteen simultaneous walkers cannot grow the ring pool past 32.
+        ripples.clear()
+        for i in 0..<200 {
+            let samples = (0..<16).map { RainFootprint(source:"walker-\($0)",point:RainPoint(x:Double(i)*5,y:Double($0)*20),scale:1) }
+            ripples.advance(at:Double(i)/30,feet:samples,field:wetField,wind:0)
+            precondition(ripples.rings.count <= 32)
+        }
+        ripples.advance(at:20,feet:[],field:wetField,wind:0)
+        precondition(ripples.rings.isEmpty)
+        // Exercise the real controller's shared clock and provider wiring in
+        // controlled uncovered coordinates, independent of the user's windows.
+        let footstepsController = DesktopRainController()
+        var walkX = -10000.0
+        footstepsController.footprintProvider = {
+            walkX += 5
+            return [RainFootprint(source:"clock-check",point:RainPoint(x:walkX,y:-10000),scale:1)]
+        }
+        footstepsController.configure(active:true,settings:RainSettings(quantity:0),sound:false,volume:0)
+        RunLoop.main.run(until:Date().addingTimeInterval(0.5))
+        precondition((footstepsController.diagnostics["footRipples"] as? Int ?? 0) > 0,"Shared rain clock never sampled moving feet")
+        footstepsController.configure(active:true,settings:RainSettings(style:.snow),sound:false,volume:0)
+        RunLoop.main.run(until:Date().addingTimeInterval(0.1))
+        precondition(footstepsController.diagnostics["footRipples"] as? Int == 0,"Snow retained rain footsteps")
+        footstepsController.stop()
+        precondition(footstepsController.diagnostics["footRipples"] as? Int == 0)
+        // Actual native character + actual rain renderer, exported at three ages.
+        let scene = NSView(frame:NSRect(x:0,y:0,width:400,height:300))
+        scene.wantsLayer = true; scene.layer?.backgroundColor = NSColor(calibratedWhite:0.08,alpha:1).cgColor
+        let rain = RainView(frame:scene.bounds,region:RainRect(x:0,y:0,width:400,height:300))
+        let sprite = SubtitleView(frame:NSRect(x:98,y:32,width:204,height:255))
+        sprite.mode = .character; sprite.setMascot(.deepseek,animating:false)
+        sprite.setRainShelterPose(RainShelterPose(frame:10,mirrored:false))
+        scene.addSubview(rain); scene.addSubview(sprite)
+        let sceneWindow = NSWindow(contentRect:scene.bounds,styleMask:[.borderless],backing:.buffered,defer:false)
+        sceneWindow.isReleasedWhenClosed = false; sceneWindow.contentView = scene; sceneWindow.orderFrontRegardless()
+        try FileManager.default.createDirectory(atPath:"output/foot-ripples",withIntermediateDirectories:true)
+        for age in [0.12,0.45,0.85] {
+            rain.step(dt:0,field:wetField,enabled:true,settings:RainSettings(quantity:0),
+                footRipples:[RainFootRipple(point:RainPoint(x:200,y:260),birth:0,scale:1)],rippleTime:age)
+            let bitmap = scene.bitmapImageRepForCachingDisplay(in:scene.bounds)!
+            scene.cacheDisplay(in:scene.bounds,to:bitmap)
+            try bitmap.representation(using:.png,properties:[:])!.write(to:URL(fileURLWithPath:"output/foot-ripples/native-\(age).png"))
+        }
+        // Overlapping window masks must remain dry rather than cancelling
+        // each other out in an even-odd clip.
+        let mask = RoofField(windows:[RainRect(x:175,y:255,width:25,height:10),RainRect(x:185,y:255,width:25,height:10)])
+        rain.step(dt:0,field:mask,enabled:true,settings:RainSettings(quantity:0),
+            footRipples:[RainFootRipple(point:RainPoint(x:200,y:260),birth:0,scale:1)],rippleTime:0.45)
+        let masked = rain.bitmapImageRepForCachingDisplay(in:rain.bounds)!
+        rain.cacheDisplay(in:rain.bounds,to:masked)
+        var visibleRingPixels = 0
+        for y in 0..<masked.pixelsHigh { for x in 0..<masked.pixelsWide {
+            let point = RainPoint(x:Double(x)/Double(masked.pixelsWide)*400,y:Double(y)/Double(masked.pixelsHigh)*300)
+            let alpha = masked.colorAt(x:x,y:y)?.alphaComponent ?? 0
+            if mask.windows.contains(where:{ $0.contains(point) }), point.x > 176, point.x < 209, point.y > 256, point.y < 264 {
+                precondition(alpha < 0.01,"Ripple painted over overlapping windows")
+            }
+            if alpha > 0.01 { visibleRingPixels += 1 }
+        }}
+        precondition(visibleRingPixels > 0,"Window clipping erased the whole ripple")
+        sceneWindow.orderOut(nil)
+        print("Foot ripple checks passed: wet/dry/stationary/teleport, 16 walkers, 32-ring cap, native character render")
         let report: [String:Any] = ["actualSolverWetHits":wetHits,"coveredHits":0,"registeredPoseScaleFacingCases":registered,
             "particleLimit":64,"poolVoices":2,"audioPlaysFor101ContactsIn100ms":controller.basinSoundPlays,
             "decodeCountStableAcross100Contacts":true,"audioTestVolume":0,

@@ -50,9 +50,9 @@ import QuartzCore
             var samples: [Double] = []
             for i in 0..<60 {
                 let cycle = i/15
-                let event = WeatherStormTiming.event(at:Double(cycle)*12,seed:42)
+                let event = WeatherStormTiming.event(at:Double(cycle)*WeatherStormTiming.period,seed:42)
                 render.step(dt:0,field:RoofField(),enabled:true,settings:RainSettings(style:.thunder),
-                            weatherTime:flashing ? event.lightningAt+0.025 : Double(cycle)*12,stormSeed:42)
+                            weatherTime:flashing ? event.lightningAt+0.025 : Double(cycle)*WeatherStormTiming.period,stormSeed:42)
                 let start = CACurrentMediaTime()
                 render.cacheDisplay(in:render.bounds,to:bitmap)
                 if i >= 10 { samples.append((CACurrentMediaTime()-start)*1000) }

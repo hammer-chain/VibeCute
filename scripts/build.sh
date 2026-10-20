@@ -74,8 +74,8 @@ for directory in CutoutCharacters DeepSeekCutout DeepSeekThinking OrangeHoodieTh
     rm -rf "$app/Contents/Resources/$directory"
     cp -R "Sources/CodexCaptions/Resources/$directory" "$app/Contents/Resources/"
 done
-cp Sources/CodexCaptions/Resources/rain.wav "$app/Contents/Resources/"
-cp Sources/CodexCaptions/Resources/thunder.wav "$app/Contents/Resources/"
+cp Sources/CodexCaptions/Resources/rain-bed-loop.wav Sources/CodexCaptions/Resources/rain-drops-loop.wav "$app/Contents/Resources/"
+cp Sources/CodexCaptions/Resources/thunder*.wav "$app/Contents/Resources/"
 cp Sources/CodexCaptions/Resources/basin-hit.wav "$app/Contents/Resources/"
 cp Sources/CodexCaptions/Resources/LipVowels.json "$app/Contents/Resources/"
 swift scripts/icon.swift "$app/Contents/Resources/AppIcon.icns"

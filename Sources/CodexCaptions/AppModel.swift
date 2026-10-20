@@ -11,6 +11,8 @@ final class AppModel: ObservableObject {
     @Published var desktopRainWind: Double { didSet { save("desktopRainWind", desktopRainWind); configureDesktopRain() } }
     @Published var desktopRainQuantity: Double { didSet { save("desktopRainQuantity", desktopRainQuantity); configureDesktopRain() } }
     @Published var desktopRainVolume: Double { didSet { save("desktopRainVolume", desktopRainVolume); configureDesktopRain() } }
+    @Published var desktopRainDropsVolume: Double { didSet { save("desktopRainDropsVolume", desktopRainDropsVolume); configureDesktopRain() } }
+    @Published var desktopRainThunderVolume: Double { didSet { save("desktopRainThunderVolume", desktopRainThunderVolume); configureDesktopRain() } }
     @Published var desktopRainBasinVolume: Double { didSet { save("desktopRainBasinVolume",desktopRainBasinVolume); configureDesktopRain() } }
     @Published private(set) var desktopRainCity: RainCity?
     @Published private(set) var rainCityResults: [RainCity] = []
@@ -18,6 +20,11 @@ final class AppModel: ObservableObject {
     @Published private(set) var rainWeatherStatus = "选择城市后启用自动天气"
     @Published private(set) var rainRenderStatus = "桌面雨已关闭"
     @Published private(set) var rainSoundStatus = "天气音效已关闭"
+    @Published private(set) var rainAudioIntensity: RainIntensity = .moderate
+    var rainAudioMappingLabel: String {
+        if weatherPreview == .snow { return "下雪静音" }
+        return "\(rainAudioIntensity.rawValue) · 雨声100%对应本档上限\(Int(rainAudioIntensity.soundCeiling*100))%"
+    }
     @Published private(set) var weatherPreview: DesktopWeatherPreview?
     var weatherPreviewStatus: String { weatherPreview.map { "正在预览：\($0.rawValue) · 停止后恢复真实天气" } ?? "未预览 · 真实天气照常运行" }
     func previewWeather(_ preview: DesktopWeatherPreview) {
@@ -69,8 +76,9 @@ final class AppModel: ObservableObject {
     }
     private func updateRainRenderer() {
         if let weatherPreview {
+            if rainAudioIntensity != weatherPreview.settings.soundIntensity { rainAudioIntensity = weatherPreview.settings.soundIntensity }
             desktopRain.configure(active: true, settings: weatherPreview.settings, sound: desktopRainSound,
-                                  volume: desktopRainVolume,basinVolume:desktopRainBasinVolume)
+                                  volume: desktopRainVolume,dropsVolume:desktopRainDropsVolume,thunderVolume:desktopRainThunderVolume,basinVolume:desktopRainBasinVolume)
             rainRenderStatus = "开发者天气预览：\(weatherPreview.rawValue)"
             rainSoundStatus = desktopRain.soundStatus
             return
@@ -82,10 +90,14 @@ final class AppModel: ObservableObject {
             speed: bounded(desktopRainSpeed, 0.55...2.2, 1),
             wind: tan(bounded(desktopRainWind, -40...40, 0) * .pi / 180),
             quantity: bounded(desktopRainQuantity, 0.35...3, 1),
-            style: desktopRainAutomatic && rainThunderstorm ? .thunder : .rain)
+            style: desktopRainAutomatic && rainThunderstorm ? .thunder : .rain,
+            intensity: desktopRainAutomatic ? rainWeather.intensityActive : nil)
+        if rainAudioIntensity != settings.soundIntensity { rainAudioIntensity = settings.soundIntensity }
         let active = desktopRainEnabled && (!desktopRainAutomatic || (desktopRainCity != nil && rainIsWet))
         desktopRain.configure(active: active, settings: settings, sound: desktopRainSound,
                               volume: bounded(desktopRainVolume, 0...1, 0.35),
+                              dropsVolume:bounded(desktopRainDropsVolume,0...1,0.45),
+                              thunderVolume:bounded(desktopRainThunderVolume,0...1,0.35),
                               basinVolume:bounded(desktopRainBasinVolume,0...1,0.6))
         if rainSoundStatus != desktopRain.soundStatus { rainSoundStatus = desktopRain.soundStatus }
         let label = active ? "桌面雨正在显示" : desktopRainEnabled ? "自动模式 · 等待当前有雨" : "桌面雨已关闭"
@@ -644,7 +656,9 @@ final class AppModel: ObservableObject {
         desktopRainSpeed = rainNumber("desktopRainSpeed", 1, 0.55...2.2)
         desktopRainWind = rainNumber("desktopRainWind", 0, -40...40)
         desktopRainQuantity = rainNumber("desktopRainQuantity", 1, 0.35...3)
-        desktopRainVolume = rainNumber("desktopRainVolume", 0.35, 0...1)
+        desktopRainVolume = rainNumber("desktopRainVolume", 0.15, 0...1)
+        desktopRainDropsVolume = rainNumber("desktopRainDropsVolume", 0.45, 0...1)
+        desktopRainThunderVolume = rainNumber("desktopRainThunderVolume", rainNumber("desktopRainVolume", 0.35, 0...1), 0...1)
         desktopRainBasinVolume = rainNumber("desktopRainBasinVolume", 0.6, 0...1)
         let storedRainCity = defaults.data(forKey: "desktopRainCity").flatMap { try? JSONDecoder().decode(RainCity.self, from: $0) }
         desktopRainCity = storedRainCity?.valid == true ? storedRainCity : nil
@@ -771,6 +785,7 @@ final class AppModel: ObservableObject {
     func start() {
         rainStarted = true
         desktopRain.onSuspension = { [weak self] in self?.rainShelter.stopAll() }
+        desktopRain.footprintProvider = { [weak self] in self?.overlays.weatherFootprints ?? [] }
         desktopRain.basinProvider = { [weak self] in self?.rainShelter.basinSurfaces ?? [] }
         desktopRain.onBasinImpact = { [weak self] impact,now in self?.rainShelter.receiveBasinImpact(impact,at:now) }
         desktopRain.onStatus = { [weak self] message in

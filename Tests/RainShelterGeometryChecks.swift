@@ -41,8 +41,23 @@ import CoreGraphics
             }}
         }
         let clippedArea = CGRect(x:area.minX,y:window.minY+50,width:area.width,height:area.height)
-        check(target(RainShelterPlanner.route(origin:high,anchor:high,body:body,allowed:clippedArea,window:window,wind:0,scale:1)) == nil,
-              "Off-screen bottom edge silently became a mid-window destination")
+        let interior = target(RainShelterPlanner.route(origin:high,anchor:high,body:body,allowed:clippedArea,window:window,wind:0,scale:1))!
+        check(clippedArea.contains(interior),"Interior fallback left legal group bounds")
+        check(window.insetBy(dx:7.9,dy:7.9).contains(body.offsetBy(dx:interior.x,dy:interior.y)),"Interior fallback clipped the character")
+        check(interior.y > window.minY+8-body.minY,"Unreachable window bottom remained the target")
+        verifyDry(interior,body:body,window:window,wind:0.8)
+        for scale in [0.7,1.0,1.5] {
+            let scaled = CGRect(x:body.minX*scale,y:body.minY*scale,width:body.width*scale,height:body.height*scale)
+            let legal = CGRect(x:area.minX,y:window.minY+40,width:area.width,height:30)
+            let p = target(RainShelterPlanner.route(origin:origin,anchor:origin,body:scaled,allowed:legal,window:window,wind:-0.5,scale:scale))!
+            check(legal.contains(p),"Caption-limited interior not reachable")
+            check(window.contains(scaled.offsetBy(dx:p.x,dy:p.y)),"Scaled interior destination clipped artwork")
+        }
+        let tinyFront = CGRect(x:100,y:200,width:40,height:300)
+        let alternative = target(RainShelterPlanner.route(origin:origin,anchor:origin,body:body,allowed:area,window:tinyFront,wind:0,scale:1,windows:[tinyFront,window]))!
+        check(window.contains(body.offsetBy(dx:alternative.x,dy:alternative.y)),"Failed to search another ordinary window")
+        let impossibleArea = CGRect(x:area.minX,y:window.maxY+100,width:area.width,height:30)
+        check(target(RainShelterPlanner.route(origin:origin,anchor:origin,body:body,allowed:impossibleArea,window:window,wind:0,scale:1)) == nil,"Disjoint interior invented a destination")
         check(target(RainShelterPlanner.route(origin:origin,anchor:origin,body:body,allowed:area,window:CGRect(x:400,y:250,width:420,height:100),wind:0,scale:1)) == nil,"Short window accepted a dry shadow outside its rectangle")
         let fallback = RainShelterPlanner.route(origin:origin,anchor:origin,body:body,allowed:area,window:CGRect(x:500,y:200,width:40,height:300),wind:0,scale:1)
         if case .pace(let lo,let hi,let y) = fallback {
@@ -51,6 +66,17 @@ import CoreGraphics
         check(target(RainShelterPlanner.route(origin:origin,anchor:origin,body:body,allowed:area,window:nil,wind:0,scale:1)) == nil,"Missing foreground window accepted")
         let cramped = RainShelterPlanner.route(origin:origin,anchor:origin,body:body,allowed:CGRect(x:0,y:0,width:0,height:0),window:nil,wind:0,scale:1)
         if case .pace(let lo,let hi,_) = cramped { check(lo == hi,"Zero-space fallback invented travel") }
+        for top in [900.0,1440.0] { for scale in [0.7,1.0,1.5] {
+            let b = CGRect(x:-600,y:120,width:147*scale,height:184*scale)
+            let containing = RainRect(x:b.minX-10,y:top-b.maxY-10,width:b.width+20,height:b.height+20)
+            let other = RainRect(x:800,y:100,width:100,height:100)
+            check(RainShelterPlanner.isInsideWindow(body:b,windows:[other,containing],displayTop:top),"Any-window/negative-coordinate/scale containment failed")
+            check(!RainShelterPlanner.isInsideWindow(body:b,windows:[other],displayTop:top),"Unrelated window suppressed shelter")
+            let partial = RainRect(x:containing.x+30,y:containing.y,width:containing.width,height:containing.height)
+            check(!RainShelterPlanner.isInsideWindow(body:b,windows:[partial],displayTop:top),"Partial overlap suppressed shelter")
+            let shadow = b.offsetBy(dx:0,dy:-containing.height-30)
+            check(!RainShelterPlanner.isInsideWindow(body:shadow,windows:[containing],displayTop:top),"Below-window rain shadow counted as inside")
+        }}
         let destination = CGPoint(x:360,y:20)
         var motion = RainShelterMotion(origin:origin,at:0)
         var sample = motion.update(at:0,raining:true,route:.shelter(destination),scale:1)

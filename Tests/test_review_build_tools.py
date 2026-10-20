@@ -20,7 +20,7 @@ class SourceTests(unittest.TestCase):
     def test_audio_resources_reach_both_signed_profiles(self):
         # SwiftPM debug tests can pass while the explicit signed-app assembler
         # silently omits a sound. Check the two independent resource manifests.
-        declared = set(re.findall(r'\.copy\("Resources/([^"/]+\.wav)"\)',
+        declared = set(re.findall(r'\.copy\("Resources/([^"/]+\.(?:wav|mp3))"\)',
                                   (ROOT / 'Package.swift').read_text()))
         self.assertTrue(declared)
         for name in ['development', 'release']:

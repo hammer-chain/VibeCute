@@ -61,3 +61,17 @@ check(field.isSheltered(movingDrop, wind: 1), "new angled shadow rejects existin
 check(!field.isSheltered(p(20, 300), wind: 0.85), "unaffected drop survives new wind")
 check(!field.isSheltered(p(20, 300), wind: 0.85, padding: 1.15), "size growth keeps far exposed drops")
 print("Passed \(assertions) geometry assertions.")
+
+var thunderDeck = WeatherThunderDeck()
+var lastThunder: Int?
+for _ in 0..<100 {
+    var heard = Set<Int>()
+    for _ in WeatherThunderDeck.resources {
+        let next = thunderDeck.next()
+        check(next != lastThunder,"thunder repeats across shuffled bags")
+        check(heard.insert(next).inserted,"thunder missing from shuffled bag")
+        lastThunder = next
+    }
+    check(heard.count == 4,"all four thunder recordings must be used")
+}
+print("Passed thunder shuffle checks: 400 events, no adjacent repeats, all four variants per bag.")

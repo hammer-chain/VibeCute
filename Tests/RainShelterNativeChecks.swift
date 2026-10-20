@@ -91,20 +91,45 @@ import CaptionCore
         snapshot.suspended = true
         coordinator.update(snapshot,enabled:true,at:150.1)
         precondition(coordinator.sources.isEmpty && actor.subtitle.rainShelterPose == nil,"Sleep/lock retained actor motion")
-        // Even a dry start already inside the window must descend to its bottom.
+        // Already inside any ordinary window: no entry or descent to its bottom.
         let highStart = CGPoint(x:roof.minX+30,y:roof.minY+90)
         actor.panel.setFrameOrigin(highStart)
         let highBody = DeepSeekRainArtwork.body(in:actor.subtitle.bounds,scale:1).offsetBy(dx:highStart.x,dy:highStart.y)
         precondition(roof.contains(highBody),"High-start fixture must begin fully inside")
         snapshot.suspended = false; snapshot.frontWindow = quartz
-        coordinator.update(snapshot,enabled:true,at:160)
-        precondition(actor.subtitle.rainShelterPose?.frame == 0,"Inside-window high start skipped travel to bottom edge")
-        for i in 1...900 { coordinator.update(snapshot,enabled:true,at:160+Double(i)/60) }
-        let highArrival = actor.panel.frame.origin
-        let highArrivalBody = DeepSeekRainArtwork.body(in:actor.subtitle.bounds,scale:1).offsetBy(dx:highArrival.x,dy:highArrival.y)
-        precondition(abs(highArrivalBody.minY-roof.minY-8)<0.1,"High native start did not reach the window bottom")
-        precondition(highArrival.y < highStart.y && roof.contains(highArrivalBody))
+        let plansBeforeInside = coordinator.plans
+        for i in 0...120 { coordinator.update(snapshot,enabled:true,at:160+Double(i)/60) }
+        precondition(coordinator.sources.isEmpty && actor.panel.frame.origin == highStart)
+        precondition(actor.subtitle.rainShelterPose == nil)
+        precondition(coordinator.plans == plansBeforeInside,"Inside-window actor still plans movement")
+        // Front window misses the character; a different ordinary window contains it.
+        snapshot.frontWindow = quartzRect(appKit:RainRect(x:roof.minX+500,y:roof.minY,width:100,height:100),mainDisplayTop:screen.frame.maxY)
+        snapshot.windows = [snapshot.frontWindow!,quartz]
+        for i in 0...120 { coordinator.update(snapshot,enabled:true,at:163+Double(i)/60) }
+        precondition(coordinator.sources.isEmpty && actor.panel.frame.origin == highStart,"Non-front window was ignored")
+        precondition(actor.subtitle.rainShelterPose == nil)
+        // Removing the containing window resumes ordinary shelter behavior.
+        snapshot.windows = [snapshot.frontWindow!]
+        coordinator.update(snapshot,enabled:true,at:166)
+        precondition(actor.subtitle.rainShelterPose != nil,"Window disappearance never resumed shelter")
+        coordinator.stopAll()
+        overlays.update([],font:14,opacity:1,bottom:24,screenIndex:0,movable:true,focusedID:"",characterBindings:[:])
+
+        // A real group can reach the window interior even when its bottom is
+        // below the screen and therefore outside the group's allowed origins.
+        overlays.update([],font:14,opacity:1,bottom:24,screenIndex:0,movable:true,focusedID:"",
+            restingMascots:[.companion,.codex],characterBindings:[.companion:.deepseek,.codex:.codex])
+        actor.panel.setFrameOrigin(start)
+        let clippedRoof = CGRect(x:start.x+230,y:area.minY-180,width:350,height:600)
+        snapshot.frontWindow = quartzRect(appKit:RainRect(x:clippedRoof.minX,y:clippedRoof.minY,width:clippedRoof.width,height:clippedRoof.height),mainDisplayTop:screen.frame.maxY)
+        snapshot.windows = []
+        for i in 0...900 { coordinator.update(snapshot,enabled:true,at:180+Double(i)/60) }
+        let interiorArrival = actor.panel.frame.origin
+        let interiorBody = DeepSeekRainArtwork.body(in:actor.subtitle.bounds,scale:1).offsetBy(dx:interiorArrival.x,dy:interiorArrival.y)
+        precondition(clippedRoof.contains(interiorBody) && area.contains(interiorBody),"Native interior arrival is not inside window and screen")
+        precondition(interiorBody.minY > clippedRoof.minY+8,"Native actor still targeted off-screen bottom")
         precondition(actor.subtitle.rainShelterPose == nil && actor.subtitle.originalThinkingPoseActive)
+        try render("native-interior-fallback")
         coordinator.stopAll()
         overlays.update([],font:14,opacity:1,bottom:24,screenIndex:0,movable:true,focusedID:"",characterBindings:[:])
 
@@ -124,23 +149,29 @@ import CaptionCore
         model.selectRainCity(RainCity(id:1816670,name:"北京",latitude:39.9075,longitude:116.39723,admin1:nil,country:"中国"))
         model.desktopRainAutomatic = true; model.desktopRainEnabled = true; wait(0.2)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.isEmpty == true,"Dry weather triggered basin animation")
+        func wetActorAccountedFor() -> Bool {
+            let d = model.rainShelterDiagnostics
+            let active = (d["actors"] as? [[String:Any]] ?? []).compactMap { $0["source"] as? String }
+            let inside = d["alreadyInsideWindow"] as? [String] ?? []
+            return Set(active+inside).count == 1
+        }
         wet = true
         model.selectRainCity(RainCity(id:2950159,name:"Berlin",latitude:52.52,longitude:13.41,admin1:nil,country:"Germany"))
         wait(0.3)
-        precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.count == 1,"Automatic wet weather did not reach blue fish")
+        precondition(wetActorAccountedFor(),"Automatic wet weather did not reach blue fish")
         model.desktopRainAutomatic = false; wait(0.2)
         precondition(model.desktopRainDiagnostics["active"] as? Bool == true)
-        precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.count == 1,"Real rain did not reach companion blue fish")
+        precondition(wetActorAccountedFor(),"Real rain did not reach companion blue fish")
         model.previewWeather(.snow); wait(3.5)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.isEmpty == true,"Snow triggered rain shelter")
         model.previewWeather(.thunder); wait(0.25)
-        precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.count == 1,"Thunder preview did not trigger shelter")
+        precondition(wetActorAccountedFor(),"Thunder preview did not trigger shelter")
         NSWorkspace.shared.notificationCenter.post(name:NSWorkspace.screensDidSleepNotification,object:nil)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.isEmpty == true,"Sleep notification did not immediately release rain action")
         precondition(model.desktopRainDiagnostics["active"] as? Bool == false)
         NSWorkspace.shared.notificationCenter.post(name:NSWorkspace.screensDidWakeNotification,object:nil)
         wait(0.2)
-        precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.count == 1,"Wake did not resume rain behavior")
+        precondition(wetActorAccountedFor(),"Wake did not resume rain behavior")
         model.desktopRainEnabled = false; model.stopWeatherPreview(); wait(3.5)
         precondition((model.rainShelterDiagnostics["actors"] as? [[String:Any]])?.isEmpty == true)
         precondition(model.desktopRainDiagnostics["active"] as? Bool == false)
@@ -150,7 +181,7 @@ import CaptionCore
             "coordinatorSampleCalls":times.count,"p95UpdateMs":times[Int(Double(times.count-1)*0.95)],
             "planningCallsFor10Seconds":plansAfterArrival,"extraWindowQueries":0,"extraWeatherRequests":0,
             "arrivalX":arrival.x,"fallbackSpan":maxX-minX,"fallbackDirections":directions.count,
-            "cases":["entry-run-sit","whole-body-dry-arrival","moving-window-replan","window-disappears-local-fallback","both-directions","manual-interruption-and-cooldown","rain-stop","sleep-lock-stop","AppModel-sleep-wake-notifications","other-character-preserved","AppModel-auto-wet","dry-no-trigger","AppModel-manual-rain","snow-no-trigger","thunder-trigger","preview-stop"]]
+            "cases":["window-bottom-unreachable-interior-arrival","inside-front-window-no-action","inside-other-window-no-action","containing-window-removed-resumes","entry-run-sit","whole-body-dry-arrival","moving-window-replan","window-disappears-local-fallback","both-directions","manual-interruption-and-cooldown","rain-stop","sleep-lock-stop","AppModel-sleep-wake-notifications","other-character-preserved","AppModel-auto-wet","dry-no-trigger","AppModel-manual-rain","snow-no-trigger","thunder-trigger","preview-stop"]]
         try JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]).write(to:URL(fileURLWithPath:"output/rain-shelter/native-performance.json"))
         print("Rain shelter native checks passed: real panels, resources, movement, weather integration and bounded planning")
     }

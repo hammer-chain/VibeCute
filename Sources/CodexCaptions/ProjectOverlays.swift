@@ -984,6 +984,18 @@ final class ProjectOverlays {
     func allowedBackdropOrigins(for source: CaptionMascot, in area: CGRect) -> CGRect {
         groups[groupKey(for:source)]?.allowedOrigins(in:area) ?? .null
     }
+    var weatherFootprints: [RainFootprint] {
+        guard let display = NSScreen.screens.first else { return [] }
+        return groups.prefix(16).compactMap { key,group in
+            let character = group.character, view = character.subtitle
+            guard character.panel.isVisible, view.showsMascot, view.mode != .bubble,
+                  !character.panel.isManuallyDragging, !view.dragReaction.active,
+                  view.screenEdgeDock == nil, view.sleepSample == nil else { return nil }
+            let scale = Double(view.layoutScale)
+            return RainFootprint(source:key,point:RainPoint(x:character.panel.frame.minX+view.bounds.midX,
+                y:display.frame.maxY-character.panel.frame.minY-8*scale),scale:scale)
+        }
+    }
     var rainShelterActors: [(source: CaptionMascot, character: OverlayController)] {
         var seen = Set<String>()
         return CaptionMascot.allCases.compactMap { source in
