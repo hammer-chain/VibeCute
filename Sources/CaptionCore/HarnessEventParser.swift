@@ -63,8 +63,10 @@ public final class HarnessEventParser {
             guard let version = object["version"] as? Int, [0, 3, 4].contains(version),
                   let depth = object["delegationDepth"] as? Int, depth >= 0,
                   let id = object["id"] as? String else { return [] }
-            isSubagent = depth > 0 || object["parentSession"] != nil
-            parentSessionID = object["parentSession"] as? String
+            // Seeded/forked main chats also carry parentSession. Only delegation
+            // depth establishes child-agent identity.
+            isSubagent = depth > 0
+            parentSessionID = isSubagent ? object["parentSession"] as? String : nil
             return [.metadata(id: id, project: object["cwd"] as? String ?? "")]
         }
         guard let data = object["data"] as? [String: Any] else { return [] }
@@ -72,6 +74,21 @@ public final class HarnessEventParser {
         responseTiming.observe(type: type, data: data,
             time: object[type.hasSuffix("-chunks") ? "time0" : "time"] as? Double)
         switch type {
+        case "approval/asked":
+            guard let id = data["id"] as? String, !id.isEmpty,
+                  let tool = data["toolName"] as? String, !tool.isEmpty,
+                  let reason = data["reason"] as? String, !reason.isEmpty,
+                  id.utf8.count <= 1024, tool.utf8.count <= 1024, reason.utf8.count <= 32_768 else { return [] }
+            var request = UserQuestionRequest(id: id, turnID: nil, asynchronous: false,
+                questions: [UserQuestion(id: id, title: "权限申请 · " + tool, options: ["允许本次", "拒绝"], descriptions: ["仅允许这一次操作", "拒绝这次操作"])], date: date)
+            request.approval = true
+            request.externalApproval = true
+            request.approvalContent = ApprovalContent(title: "权限申请 · " + tool, reason: reason,
+                details: "可在此允许一次或拒绝，也可前往 DSH 处理。")
+            return [.question(request)]
+        case "approval/decided":
+            guard let id = data["id"] as? String, !id.isEmpty else { return [] }
+            return [.questionResolved(id)]
         case "session/title":
             let title = CaptionText.clean(data["title"] as? String ?? "")
             return title.isEmpty ? [] : [.title(title)]
@@ -119,8 +136,31 @@ public final class HarnessEventParser {
             } else if ["write", "edit", "apply_patch"].contains(name), let path = (args?["path"] ?? args?["filePath"]) as? String {
                 detail = "正在编辑：" + URL(fileURLWithPath: path).lastPathComponent
             }
+            if name == "ask_user_question", let rows = args?["questions"] as? [[String: Any]],
+               var request = UserQuestionRequest.parse(id:id, turnID:nil, asynchronous:false, questions:rows, date:date) {
+                request.externalQuestion = true
+                return [.question(request)]
+            }
             return caption(detail, kind: .tool, date: date)
+        case "user/message":
+            if let source = data["source"] as? [String:Any], source["kind"] as? String == "user-question-reply",
+               let id = source["callId"] as? String { return [.questionResolved(id)] }
+            return []
         case "tool/result":
+            // Question results use either the current toolCallId or the legacy source.callId shape.
+            if let message = data["message"] as? [String:Any],
+               let id = message["toolCallId"] as? String ?? (message["source"] as? [String:Any])?["callId"] as? String,
+               tools[id]?.name == "ask_user_question" {
+                let blocks = message["content"] as? [[String:Any]] ?? []
+                let waiting = blocks.contains { block in
+                    guard let text = block["text"] as? String, let bytes = text.data(using:.utf8),
+                          let payload = try? JSONSerialization.jsonObject(with:bytes) as? [String:Any] else { return false }
+                    return payload["pending"] as? Bool == true
+                }
+                if waiting { return [] }
+                tools.removeValue(forKey:id)
+                return [.questionResolved(id)]
+            }
             guard let message = data["message"] as? [String: Any], let source = message["source"] as? [String: Any],
                   let id = source["callId"] as? String, let call = tools.removeValue(forKey: id) else { return [] }
             let blocks = message["content"] as? [[String: Any]] ?? []

@@ -46,7 +46,7 @@ final class QuestionReplyView: NSView {
     private var contentWidth: CGFloat = 0
     private var repliesInCodex: Bool {
         guard let request, !request.approval, request.questions.indices.contains(page) else { return false }
-        return request.questions[page].options.isEmpty
+        return request.questions[page].options.isEmpty || request.questions[page].multiSelect
     }
 
     init() {
@@ -73,7 +73,7 @@ final class QuestionReplyView: NSView {
         close.action = #selector(closeBubble)
         close.identifier = NSUserInterfaceItemIdentifier("close-request-bubble")
         close.setAccessibilityLabel("关闭气泡")
-        close.toolTip = "关闭此气泡；仍可在 Codex 中处理请求"
+        close.toolTip = "关闭此气泡；仍可在原应用中处理请求"
         close.font = .systemFont(ofSize: 18, weight: .regular)
         [heading, context, scroll, previous, next, submit, ownReply, deny, allow, scope, close, status].forEach(addSubview)
         setAccessibilityRole(.group)
@@ -95,11 +95,12 @@ final class QuestionReplyView: NSView {
                    onClose: (() -> Void)? = nil,
                    onSubmit: @escaping ([String: String], @escaping (Result<Void, Error>) -> Void) -> Void) {
         self.onSubmit = onSubmit; self.onOpenConversation = onOpenConversation; self.onClose = onClose
-        heading.stringValue = title.isEmpty ? "Codex 对话" : title
+        heading.stringValue = title.isEmpty ? request.applicationName + " 对话" : title
         guard self.request != request else { updateControls(); return }
+        close.toolTip = "关闭此气泡；仍可在 " + request.applicationName + " 中处理请求"
         self.request = request; page = 0; answers = [:]; selections = [:]
         submitting = false; uncertain = false; generation = UUID(); status.stringValue = ""
-        setAccessibilityLabel((request.approval ? "Codex 权限审批 · " : "Codex 提问 · ") + title)
+        setAccessibilityLabel((request.applicationName + (request.approval ? " 权限审批 · " : " 提问 · ")) + title)
         contentWidth = 0; rebuildPage(); needsLayout = true
         // Focus is opt-in for the isolated native fixture, never for a real request.
         if CommandLine.arguments.contains("--question-focus-fixture") {
@@ -238,12 +239,12 @@ final class QuestionReplyView: NSView {
         close.isEnabled = onClose != nil
         let approval = request?.approval == true
         let count = request?.questions.count ?? 0
-        context.stringValue = "Codex · " + (approval ? "等待审批" : "等待回复") + (count > 1 ? "  ·  \(page + 1)/\(count)" : "")
+        context.stringValue = (request?.applicationName ?? "Codex") + " · " + (approval ? "等待审批" : "等待回复") + (count > 1 ? "  ·  \(page + 1)/\(count)" : "")
         previous.isHidden = approval || count <= 1; next.isHidden = previous.isHidden
         previous.isEnabled = page > 0 && !submitting && !uncertain
         next.isEnabled = page + 1 < count && !submitting && !uncertain
         submit.isHidden = approval || repliesInCodex; deny.isHidden = !approval
-        ownReply.title = repliesInCodex ? "去Codex里回复" : "我要自己回复"
+        ownReply.title = request?.applicationName == "DSH" ? "去 DSH 处理" : repliesInCodex ? "去Codex里回复" : "我要自己回复"
         let options = request?.questions.first?.options ?? []
         let primary = options.first == "允许本次" || options.first == "允许本轮"
         allow.isHidden = !approval || !primary; scope.isHidden = !approval || options.count <= 2
@@ -257,7 +258,7 @@ final class QuestionReplyView: NSView {
     @objc private func closeBubble() { onClose?() }
     @objc private func openConversation() {
         guard !submitting, let onOpenConversation else { return }
-        status.stringValue = onOpenConversation() ?? "已打开 Codex 对话"
+        status.stringValue = onOpenConversation() ?? ("已打开 " + (request?.applicationName ?? "Codex"))
     }
     private func approvalChoice(_ index: Int) {
         guard let request, request.approval, !submitting, !uncertain,
@@ -293,7 +294,7 @@ final class QuestionReplyView: NSView {
     @objc private func sendReply() {
         guard let request, !submitting, !uncertain else { return }
         if let index = request.questions.firstIndex(where: { (answers[$0.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
-            page = index; rebuildPage(); status.stringValue = "请先选择选项，或到 Codex 自己回复。"; return
+            page = index; rebuildPage(); status.stringValue = "请先选择选项，或到 \(request.applicationName) 自己回复。"; return
         }
         submitting = true; status.stringValue = "正在提交…"; updateControls()
         let currentGeneration = generation
@@ -305,6 +306,13 @@ final class QuestionReplyView: NSView {
             case let .failure(error):
                 self.status.stringValue = error.localizedDescription
                 if let error = error as? QuestionReplyError, case .uncertain = error { self.uncertain = true }
+                if error is HarnessQuestionError { self.uncertain = true }
+                if let error = error as? HarnessApprovalError {
+                    switch error {
+                    case .stale, .uncertain: self.uncertain = true
+                    case .unavailable: break
+                    }
+                }
             }
             self.updateControls()
         }

@@ -54,17 +54,20 @@ final class ProjectCaptionState {
         if wasActive && !active { hideAt = max(hideAt, Date().addingTimeInterval(18)) }
         // WorkBuddy can begin a turn in SQLite before publishing any public text.
         // A withdrawn body must also disappear from the rendered page cache.
-        if value.source == .workbuddy && value.displayCaption(showAnswers: answers) == nil {
+        if value.source == .workbuddy && value.displayCaption(showAnswers: answers, showTools: tools) == nil {
             key = ""; pages = []; lastCaptionText = ""; text = ""; kind = "等待更新"
             nextPage = .distantFuture
         }
-        guard let caption = value.displayCaption(showAnswers: answers),
+        guard let caption = value.displayCaption(showAnswers: answers, showTools: tools),
               caption.kind != .tool || tools else { return }
         let newKey = value.path + caption.kind.rawValue + String(caption.date.timeIntervalSince1970)
             + caption.text + String(font > 34)
         guard key != newKey else { return }
         key = newKey
-        guard caption.kind == .subagent || Date().timeIntervalSince(caption.date) < 90 else { return }
+        // A current-turn thought remains useful while a long-running hidden tool
+        // is active, including after restarting or toggling the tool preference.
+        let retainingThought = active && !tools && value.caption?.kind == .tool
+        guard retainingThought || caption.kind == .subagent || Date().timeIntervalSince(caption.date) < 90 else { return }
         let continuing = !awaitingNewMessage && kind == caption.kind.rawValue
             && !lastCaptionText.isEmpty && caption.text.hasPrefix(lastCaptionText)
         if !continuing { typingGeneration = UUID().uuidString }

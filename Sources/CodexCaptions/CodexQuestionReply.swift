@@ -291,6 +291,17 @@ final class CodexQuestionConnection {
             if row["type"] as? String == "response", row["requestId"] as? String == id { return row }
         }
     }
+    /// Bounded one-shot framing shared with the local DSH bridge.
+    func bridgeExchange(_ value: [String: Any]) throws -> [String: Any] {
+        try write(value)
+        let header = try read(4)
+        let length = header.enumerated().reduce(0) { $0 | (Int($1.element) << ($1.offset * 8)) }
+        guard (1...65_536).contains(length),
+              let result = try JSONSerialization.jsonObject(with: read(length)) as? [String: Any] else {
+            throw QuestionReplyError.protocolChanged
+        }
+        return result
+    }
     func initialize() throws -> String {
         let response = try request("initialize", version: 0, params: ["clientType": "captions"], clientID: "initializing-client")
         guard response["resultType"] as? String == "success",

@@ -153,9 +153,47 @@ final class SubtitleView: NSView {
     private var lastTypewriterFallbackSpeed: Double?
     var captionCharactersPerSecond: Double { 1 / typewriterInterval }
     private var displayedText: String {
-        guard typewriterID != nil else { return text }
-        return String(typewriterCharacters.prefix(revealedCharacterCount))
+        let body = typewriterID == nil ? text : String(typewriterCharacters.prefix(revealedCharacterCount))
+        return body + (showsWorkingDots ? " " + String(repeating: ".", count: workingDotCount) : "")
     }
+    private var workingDotsTimer: Timer?
+    private(set) var workingDotCount = 1
+    var workingDotsRunning: Bool { workingDotsTimer != nil }
+    var showsWorkingDots: Bool {
+        isLive && mode != .character && !statusNeedsInput && statusSurface === self
+            && !text.isEmpty && captionRevealedCharacterCount >= text.count
+    }
+    private var reservesWorkingDots: Bool { isLive && mode != .character && !statusNeedsInput && !text.isEmpty }
+
+    private func refreshWorkingDots() {
+        guard showsWorkingDots else {
+            if workingDotsTimer != nil { needsDisplay = true }
+            workingDotsTimer?.invalidate(); workingDotsTimer = nil; workingDotCount = 1
+            return
+        }
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            workingDotsTimer?.invalidate(); workingDotsTimer = nil
+            if workingDotCount != 3 { workingDotCount = 3; needsDisplay = true }
+            return
+        }
+        guard workingDotsTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            guard self.showsWorkingDots, self.window?.isVisible == true else {
+                self.workingDotsTimer?.invalidate(); self.workingDotsTimer = nil; return
+            }
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                self.workingDotCount = 3
+                self.workingDotsTimer?.invalidate(); self.workingDotsTimer = nil
+            } else { self.workingDotCount = self.workingDotCount % 3 + 1 }
+            self.needsDisplay = true
+        }
+        timer.tolerance = 0.05
+        workingDotsTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+        needsDisplay = true
+    }
+
     var captionRevealedCharacterCount: Int { typewriterID == nil ? text.count : revealedCharacterCount }
     var captionTypewriterRunning: Bool { typewriterTimer != nil }
     var onCaptionProgress: ((Int, Bool) -> Void)?
@@ -175,6 +213,38 @@ final class SubtitleView: NSView {
     private var headerLayoutKey = ""
     var fontSize: CGFloat = 28 { didSet { if oldValue != fontSize { needsDisplay = true } } }
     var backdrop: CGFloat = 0.68 { didSet { if oldValue != backdrop { needsDisplay = true } } }
+    private(set) var statusCompleted = false
+    private(set) var statusNeedsInput = false
+    private var statusTimer: Timer?
+    private var statusPulse: CGFloat = 0
+    private weak var statusSurface: NSView?
+
+    func setTaskAppearance(needsInput: Bool, completed: Bool, surface: NSView?) {
+        let changed = statusCompleted != completed || statusNeedsInput != needsInput || statusSurface !== surface
+        statusCompleted = completed
+        statusNeedsInput = needsInput
+        statusSurface = surface
+        let animates = needsInput && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
+        if !animates {
+            statusTimer?.invalidate(); statusTimer = nil; statusPulse = 0
+        } else if statusTimer == nil {
+            let timer = Timer(timeInterval: 1 / 15, repeats: true) { [weak self] _ in
+                guard let self else { return }
+                guard let surface = self.statusSurface, surface.window?.isVisible == true,
+                      !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+                    self.statusTimer?.invalidate(); self.statusTimer = nil; return
+                }
+                self.statusPulse = CGFloat((1 - cos(ProcessInfo.processInfo.systemUptime * .pi / 1.4)) / 2)
+                surface.needsDisplay = true
+            }
+            timer.tolerance = 0.015
+            statusTimer = timer
+            RunLoop.main.add(timer, forMode: .common)
+        }
+        refreshWorkingDots()
+        if changed { surface?.needsDisplay = true }
+    }
+
     var isLive = false { didSet { if oldValue != isLive { needsDisplay = true } } }
     private let mascots = MascotAnimation.library
     var layoutScale: CGFloat = 1 { didSet { if oldValue != layoutScale { needsDisplay = true } } }
@@ -751,7 +821,7 @@ final class SubtitleView: NSView {
     private(set) var textMeasurementCount = 0
 
     private func textSize(for width: CGFloat) -> NSSize {
-        let key = TextMeasureKey(text: captionLayoutText ?? text, fontSize: fontSize,
+        let key = TextMeasureKey(text: (captionLayoutText ?? text) + (reservesWorkingDots ? " ..." : ""), fontSize: fontSize,
                                  scale: layoutScale, width: max(1, width - 66 * layoutScale))
         if let cached = wrappedMeasurement, cached.0 == key { return cached.1 }
         let size = NSAttributedString(string: key.text, attributes: textAttributes)
@@ -800,6 +870,7 @@ final class SubtitleView: NSView {
     func pauseTypewriter() {
         typewriterTimer?.invalidate(); typewriterTimer = nil
         onCaptionProgress?(revealedCharacterCount, false)
+        refreshWorkingDots()
     }
 
     private func startTypewriterIfNeeded() {
@@ -827,12 +898,12 @@ final class SubtitleView: NSView {
             if mascotKind == .deepseek && !usesPinkBear { return 204 * layoutScale }
             return (performanceHeadroom > 0 ? 147 : 126) * layoutScale
         }
-        let key = TextMeasureKey(text: text, fontSize: fontSize, scale: layoutScale, width: 0)
+        let key = TextMeasureKey(text: text + (reservesWorkingDots ? " ..." : ""), fontSize: fontSize, scale: layoutScale, width: 0)
         let natural: CGFloat
         if let cached = naturalMeasurement, cached.0 == key {
             natural = cached.1
         } else {
-            natural = (text as NSString).size(withAttributes: textAttributes).width + 66 * layoutScale
+            natural = (key.text as NSString).size(withAttributes: textAttributes).width + 66 * layoutScale
             textMeasurementCount += 1
             naturalMeasurement = (key, natural)
         }
@@ -974,7 +1045,7 @@ final class SubtitleView: NSView {
         RunLoop.main.add(timer, forMode: .common)
     }
 
-    deinit { animationTimer?.invalidate(); seatedMotionTimer?.invalidate(); gazeTimer?.invalidate(); seatedRecoveryTimer?.invalidate(); typewriterTimer?.invalidate() }
+    deinit { workingDotsTimer?.invalidate(); statusTimer?.invalidate(); animationTimer?.invalidate(); seatedMotionTimer?.invalidate(); gazeTimer?.invalidate(); seatedRecoveryTimer?.invalidate(); typewriterTimer?.invalidate() }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -1014,10 +1085,11 @@ final class SubtitleView: NSView {
     /// Shared by the interactive question: identical outline, tail and palette.
     func drawBubbleSurface(in box: NSRect, opaque: Bool = false) {
         let path = speechBubble(box)
-        NSColor(calibratedHue: themeHue, saturation: 0.64, brightness: 0.25, alpha: opaque ? 1 : backdrop).setFill()
+        NSColor(calibratedHue: themeHue, saturation: 0.64, brightness: statusNeedsInput ? 0.30 + 0.14 * statusPulse : 0.25, alpha: opaque ? 1 : backdrop).setFill()
         path.fill()
-        NSColor(calibratedHue: themeHue, saturation: 0.42, brightness: 0.95, alpha: 0.5).setStroke()
-        path.lineWidth = 0.8 * layoutScale; path.stroke()
+        NSColor(calibratedHue: themeHue, saturation: statusCompleted ? 0.20 : 0.42, brightness: 1,
+                alpha: statusCompleted ? 0.95 : statusNeedsInput ? 0.60 + 0.35 * statusPulse : 0.5).setStroke()
+        path.lineWidth = (statusCompleted ? 2 : statusNeedsInput ? 1.2 : 0.8) * layoutScale; path.stroke()
 
     }
 
@@ -1714,7 +1786,7 @@ final class OverlayController {
                 tailTarget: NSPoint? = nil, compactStack: Bool = false, fixedWidth: CGFloat? = nil,
                 resetManualOffset: Bool = false, restoredAnchor: NSPoint? = nil, pinkBear: Bool = false,
                 typewriterID: String? = nil, typewriterCharactersPerSecond: Double = 25, tokenSpeed: Double? = nil,
-                question: UserQuestionRequest? = nil,
+                question: UserQuestionRequest? = nil, completed: Bool = false,
                 onOpenConversation: (() -> String?)? = nil,
                 onQuestionClose: (() -> Void)? = nil,
                 onCaptionClose: (() -> Void)? = nil,
@@ -1754,6 +1826,7 @@ final class OverlayController {
             : context.hasPrefix("Claude Code") ? "Claude Code" : context.hasPrefix("OpenCode") ? "OpenCode"
             : context.hasPrefix("WorkBuddy") ? "WorkBuddy" : context.hasPrefix("豆包工作") ? "豆包工作" : "Codex"
         subtitle.mode = mode
+        subtitle.setTaskAppearance(needsInput: question != nil, completed: completed, surface: panel.contentView)
         panel.tracksCharacterDrag = mode == .character
         if mode == .character { panel.acceptsMouseMovedEvents = true }
         if (subtitle.tailTarget != nil) != (tailTarget != nil) {
@@ -1856,6 +1929,7 @@ final class OverlayController {
         onCaptionClose = nil; onOpenConversation = nil
         forceMetricsVisible = false
         subtitle.showsCaptionClose = false
+        subtitle.setTaskAppearance(needsInput: false, completed: false, surface: nil)
         subtitle.pauseTypewriter()
         subtitle.setMascot(nil, animating: false)
         hideHoverMetrics()

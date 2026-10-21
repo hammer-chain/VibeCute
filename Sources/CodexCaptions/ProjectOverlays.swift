@@ -17,6 +17,7 @@ struct OverlayItem {
     let header: String
     let title: String
     let active: Bool
+    let completed: Bool
     let mascot: CaptionMascot?
     let typewriterID: String?
     let typewriterCharactersPerSecond: Double
@@ -31,7 +32,7 @@ struct OverlayItem {
     let onCaptionClose: (() -> Void)?
 
     init(id: String, text: String, header: String, title: String, active: Bool,
-         mascot: CaptionMascot?, typewriterID: String? = nil, typewriterCharactersPerSecond: Double = 25,
+         mascot: CaptionMascot?, completed: Bool = false, typewriterID: String? = nil, typewriterCharactersPerSecond: Double = 25,
          question: UserQuestionRequest? = nil,
          averageSpeed: Double? = nil,
          quotaText: String? = nil,
@@ -41,6 +42,7 @@ struct OverlayItem {
          onCaptionClose: (() -> Void)? = nil,
          onQuestionReply: (([String: String], @escaping (Result<Void, Error>) -> Void) -> Void)? = nil) {
         self.id = id; self.text = text; self.header = header; self.title = title
+        self.completed = completed
         self.active = active; self.mascot = mascot; self.typewriterID = typewriterID
         self.typewriterCharactersPerSecond = typewriterCharactersPerSecond
         self.onOpenConversation = onOpenConversation
@@ -322,6 +324,7 @@ private final class CharacterOverlayGroup {
             return NSSize(width: min(420, max(280, availableWidth)), height: min(320, (screenArea?.height ?? 800) - 48))
         }
         measurement.mode = .bubble
+        measurement.isLive = item.active
         measurement.text = item.text
         measurement.layoutScale = scale
         measurement.fontSize = CGFloat(font) * scale
@@ -436,6 +439,7 @@ private final class CharacterOverlayGroup {
                 centerX: CGFloat? = nil, laneWidth: CGFloat? = nil, hues: [String: CGFloat] = [:],
                 audioMascot: CaptionMascot? = nil, pinkBear: Bool = false,
                 bubblesFixedToCharacter: Bool = false, restingMascot: CaptionMascot? = nil,
+                thinking: Bool = false,
                 fallbackMetrics: OverlayHoverMetrics? = nil, cutoutHair: String? = nil,
                 sharedMetrics: [(String, OverlayHoverMetrics)] = []) {
         guard !temporarilyHidden else { return }
@@ -505,7 +509,9 @@ private final class CharacterOverlayGroup {
             let transientAnchor = restoredAnchor ?? restoredFrontRetreatAnchor ?? ((edgeActive || character.panel.isManuallyDragging || relocating || scootOrigin != nil || frontRetreatOrigin != nil)
                 ? NSPoint(x:character.panel.frame.midX,y:character.panel.frame.minY) : nil)
             character.update(text: primary.text, context: primary.header, title: primary.title,
-                live: items.contains(where: \.active) || (audioMascot != nil && !pinkBear), mascot: primary.mascot, font: font, opacity: opacity,
+                // Manual edge hiding owns the pose until the user drags it out.
+                live: !edgeActive && (thinking || items.contains(where: \.active) || (audioMascot != nil && !pinkBear)),
+                mascot: primary.mascot, font: font, opacity: opacity,
                 bottom: Double(bottomMargin), screenIndex: screenIndex, movable: movable, visible: primary.mascot != nil,
                 anchor: NSPoint(x: centerX, y: area.minY + bottomMargin),
                 scale: min(2, max(0.5, characterScale)), mode: .character, restoredAnchor: transientAnchor,
@@ -599,7 +605,7 @@ private final class CharacterOverlayGroup {
                 resetManualOffset: membershipChanged, typewriterID: item.typewriterID,
                 typewriterCharactersPerSecond: item.typewriterCharactersPerSecond,
                 tokenSpeed: item.averageSpeed,
-                question: item.question, onOpenConversation: item.onOpenConversation,
+                question: item.question, completed: item.completed, onOpenConversation: item.onOpenConversation,
                 onQuestionClose: item.onQuestionClose, onCaptionClose: item.onCaptionClose, onQuestionReply: item.onQuestionReply,allowOutsideScreen:relocating)
             controller.attach(to: primary.mascot == nil ? nil : character.panel)
             nextBottom += controller.layoutHeight + gap * scale
@@ -805,7 +811,7 @@ final class ProjectOverlays {
                 akimboUtterancePause: Double = AkimboReaction.utterancePause,
                 bubblesFixedToCharacter: Bool = false,
                 audioMascots: Set<CaptionMascot> = [], pinkBearBinding: PinkBearBinding = .disabled,
-                restingMascots: Set<CaptionMascot> = [],
+                restingMascots: Set<CaptionMascot> = [], thinkingMascots: Set<CaptionMascot> = [],
                 characterBindings: [CaptionMascot: CharacterChoice]? = nil,
                 fallbackMetrics: [CaptionMascot: OverlayHoverMetrics] = [:],
                 cutoutHair: [CaptionMascot: String] = [:]) {
@@ -834,7 +840,8 @@ final class ProjectOverlays {
             ($0.id, $0.mascot.map { groupKey(for: $0) } ?? "waiting")
         })
         let audioGroups = Set(audioMascots.map { groupKey(for: $0) })
-        let restingGroups = Set(restingMascots.map { groupKey(for: $0) })
+        let thinkingGroups = Set(thinkingMascots.map { groupKey(for: $0) })
+        let restingGroups = Set(restingMascots.union(thinkingMascots).map { groupKey(for: $0) })
         for item in items.sorted(by: { $0.id < $1.id }) where appearances[item.id] == nil {
             appearances[item.id] = appearances.count
         }
@@ -900,7 +907,7 @@ final class ProjectOverlays {
             // Each bubble keeps its source-specific content and callbacks in the shared stack.
             let renderedItems = (grouped[key] ?? []).map { item in
                 OverlayItem(id: item.id, text: item.text, header: item.header, title: item.title,
-                            active: item.active, mascot: choice?.mascot, typewriterID: item.typewriterID,
+                            active: item.active, mascot: choice?.mascot, completed: item.completed, typewriterID: item.typewriterID,
                     typewriterCharactersPerSecond: item.typewriterCharactersPerSecond,
                     question: item.question, averageSpeed: item.averageSpeed, quotaText: item.quotaText,
                     metricsRefreshing: item.metricsRefreshing, onMetricsHover: item.onMetricsHover,
@@ -936,6 +943,7 @@ final class ProjectOverlays {
                          pinkBear: choice == .pinkBear,
                          bubblesFixedToCharacter: bubblesFixedToCharacter,
                          restingMascot: restingGroups.contains(key) ? choice?.mascot : nil,
+                         thinking: thinkingGroups.contains(key),
                          fallbackMetrics: source.flatMap { fallbackMetrics[$0] },
                          cutoutHair:choice == .deepseekCutout ? source.flatMap { cutoutHair[$0] }
                             ?? CharacterChoice.cutoutDefaultHair : nil,

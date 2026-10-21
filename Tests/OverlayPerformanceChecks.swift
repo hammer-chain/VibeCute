@@ -29,6 +29,19 @@ struct OverlayPerformanceChecks {
         if ProcessInfo.processInfo.environment["BALANCE_ALERT_ONLY"] == "1" { checkBalanceAlert(); return }
         if ProcessInfo.processInfo.environment["MULTI_HARNESS_CLOSE_ONLY"] == "1" { checkConcurrentHarnessClose(); return }
         if ProcessInfo.processInfo.environment["CAPTION_CLOSE_ONLY"] == "1" { checkCaptionCloseLifecycle(); return }
+        if let path = ProcessInfo.processInfo.environment["DSH_READ_CHECK"] {
+            let record = SessionRecord(url: URL(fileURLWithPath: path), source: .deepseek)
+            let start = ProcessInfo.processInfo.systemUptime
+            for _ in 0..<128 { _ = try! record.poll() }
+            require(record.snapshot.readable && !record.snapshot.id.isEmpty, "Real compressed DSH transcript is readable")
+            require(!record.isSubagent && record.parentSessionID == nil, "Seeded main session remains visible")
+            require(record.snapshot.caption != nil || record.snapshot.answer != nil, "Main session text is retained")
+            print("PASS: real DSH compressed seeded-main read; caption retained; ms=\((ProcessInfo.processInfo.systemUptime-start)*1000)")
+            return
+        }
+        if ProcessInfo.processInfo.environment["DSH_APPROVAL_ONLY"] == "1" { checkDSHApproval(); return }
+        if ProcessInfo.processInfo.environment["WORKING_DOTS_ONLY"] == "1" { checkWorkingDots(); return }
+        if ProcessInfo.processInfo.environment["TASK_APPEARANCE_ONLY"] == "1" { checkTaskAppearance(); return }
         let controller = OverlayController()
         var text = "正在检查性能，保留中文、emoji👨‍👩‍👧‍👦和字幕换行。"
         func update(font: Double = 24, opacity: Double = 0.7, live: Bool = false,
@@ -513,6 +526,129 @@ struct OverlayPerformanceChecks {
         require(controllers.allSatisfy { $0.panel.parent === character.panel }, "Native parent movement retains attachment")
         overlays.update([], font: 18, opacity: 0.7, bottom: 50, screenIndex: 0,
             movable: false, focusedID: "", characterBindings: [:])
+    }
+
+    static func checkDSHApproval() {
+        let parser = HarnessEventParser()
+        let data = try! JSONSerialization.data(withJSONObject: ["type": "approval/asked", "time": Date().timeIntervalSince1970 * 1000,
+            "data": ["id": "native-approval", "toolName": "bash", "reason": "此操作需要写入工作区外的目录，请在 DSH 中确认。"]])
+        guard case let .question(request) = parser.parse(data).first! else { fatalError("Missing approval") }
+        let controller = OverlayController()
+        controller.update(text: "权限申请", context: "DSH · 等待审批", title: "DSH 权限预览", live: false,
+            mascot: nil, font: 18, opacity: 0.8, bottom: 80, screenIndex: 0, movable: false, visible: true,
+            mode: .bubble, question: request, onOpenConversation: { nil }, onQuestionClose: {}, onQuestionReply: { _, _ in
+                fatalError("External approval must never submit through Codex")
+            })
+        RunLoop.main.run(until: Date().addingTimeInterval(0.8))
+        require(controller.subtitle.statusNeedsInput && !controller.subtitle.showsWorkingDots)
+        func buttons(_ view: NSView) -> [NSButton] {
+            (view as? NSButton).map { [$0] } ?? view.subviews.flatMap { buttons($0) }
+        }
+        let view = controller.panel.contentView!
+        let visible = buttons(view).filter { !$0.isHidden }
+        require(visible.contains { $0.title == "去 DSH 处理" && $0.isEnabled })
+        require(visible.contains { $0.title == "拒绝" && $0.isEnabled })
+        require(visible.contains { $0.title == "允许一次" && $0.isEnabled })
+        require(!visible.contains { $0.title == "发送回复" })
+        let directory = URL(fileURLWithPath: "output/dsh-approval", isDirectory: true)
+        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        view.display()
+        let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        try! bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent("native.png"))
+        controller.hide()
+        if let path = ProcessInfo.processInfo.environment["DSH_APPROVAL_LOG"] {
+            let tail = ZstdLogTail(url: URL(fileURLWithPath: path))
+            let replay = HarnessEventParser()
+            var snapshot = SessionSnapshot(path: "replay")
+            var asked = 0, decided = 0, observed = 0
+            for _ in 0..<128 {
+                for line in try! tail.read() {
+                    for event in replay.parse(line) {
+                        if case .question = event { asked += 1 }
+                        if case .questionResolved = event { decided += 1 }
+                        snapshot.apply(event)
+                        observed = max(observed, snapshot.pendingQuestions.count)
+                    }
+                }
+            }
+            require(asked > 0 && decided > 0 && observed > 0, "Real historical approvals are detected")
+            require(snapshot.pendingQuestions.isEmpty, "Processed historical approvals do not linger")
+            print("PASS: real DSH approval replay asked=\(asked) decided=\(decided) pending=0")
+        }
+        print("PASS: native DSH approval card, waiting appearance, external handling only")
+    }
+
+    static func checkWorkingDots() {
+        let controller = OverlayController()
+        func show(_ text: String = "正在整理任务", live: Bool = true, typing: String? = nil) {
+            controller.update(text: text, context: "Codex · 工作中", title: "验收", live: live,
+                mascot: nil, font: 24, opacity: 0.8, bottom: 80, screenIndex: 0,
+                movable: false, visible: true, mode: .bubble, typewriterID: typing)
+        }
+        show()
+        RunLoop.main.run(until: Date().addingTimeInterval(0.4))
+        require(controller.subtitle.showsWorkingDots)
+        require(controller.subtitle.workingDotsRunning || NSWorkspace.shared.accessibilityDisplayShouldReduceMotion)
+        let frame = controller.panel.frame
+        let first = controller.subtitle.workingDotCount
+        let measurements = controller.subtitle.textMeasurementCount
+        RunLoop.main.run(until: Date().addingTimeInterval(0.55))
+        if !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            require(first != controller.subtitle.workingDotCount, "Working dots advance")
+        }
+        require(controller.panel.frame == frame, "Dots never resize the panel")
+        require(controller.subtitle.textMeasurementCount == measurements, "Dots reuse text layout")
+        let directory = URL(fileURLWithPath: "output/working-dots", isDirectory: true)
+        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let view = controller.subtitle
+        view.display()
+        let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        try! bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent("native.png"))
+        show("新字幕正在逐字显示", typing: "new-caption")
+        require(!view.showsWorkingDots && !view.workingDotsRunning, "Typing suppresses dots")
+        RunLoop.main.run(until: Date().addingTimeInterval(1.8))
+        require(view.showsWorkingDots, "Dots resume after typing finishes")
+        show(live: false)
+        require(!view.showsWorkingDots && !view.workingDotsRunning, "Finished tasks stop dots")
+        show()
+        controller.hide()
+        require(!view.showsWorkingDots && !view.workingDotsRunning, "Hidden captions stop dots")
+        print("PASS: native working dots cycle, stable geometry/layout cache, typing/finish/hide lifecycle")
+    }
+
+    static func checkTaskAppearance() {
+        let controller = OverlayController()
+        let request = UserQuestionRequest.parse(id: "appearance", turnID: nil, asynchronous: true,
+            questions: [["title": "请选择下一步", "options": ["继续", "暂停"]]], date: Date())!
+        func show(completed: Bool = false, question: Bool = false) {
+            controller.update(text: completed ? "任务已完成" : "请选择下一步", context: "Codex · 视觉验收", title: "状态预览",
+                live: false, mascot: nil, font: 18, opacity: 0.8, bottom: 80, screenIndex: 0,
+                movable: false, visible: true, mode: .bubble, question: question ? request : nil,
+                completed: completed, onQuestionReply: { _, _ in })
+        }
+        let directory = URL(fileURLWithPath: "output/caption-status", isDirectory: true)
+        try! FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        func capture(_ name: String) {
+            let view = controller.panel.contentView!
+            view.display()
+            let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            try! bitmap.representation(using: .png, properties: [:])!.write(to: directory.appendingPathComponent(name + ".png"))
+        }
+        show(); capture("normal")
+        show(completed: true); capture("completed")
+        require(controller.subtitle.statusCompleted && !controller.subtitle.statusNeedsInput)
+        show(question: true)
+        require(!controller.subtitle.statusCompleted && controller.subtitle.statusNeedsInput)
+        RunLoop.main.run(until: Date().addingTimeInterval(0.3)); capture("waiting-a")
+        RunLoop.main.run(until: Date().addingTimeInterval(1.4)); capture("waiting-b")
+        show(completed: true)
+        require(!controller.subtitle.statusNeedsInput && controller.subtitle.statusCompleted, "Completion clears waiting appearance")
+        controller.hide()
+        require(!controller.subtitle.statusNeedsInput && !controller.subtitle.statusCompleted, "Hiding clears appearance")
+        print("PASS: native task appearance transitions and rendered normal/completed/waiting captures")
     }
 
     static func checkQuestion() {

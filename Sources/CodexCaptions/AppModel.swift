@@ -592,6 +592,7 @@ final class AppModel: ObservableObject {
     var onStatus: ((Bool) -> Void)?
     private var monitor: SessionMonitor?
     private var doubaoReader: DoubaoVisibleReader?
+    private let harnessApprovalReplies = HarnessApprovalReply()
     private lazy var questionReplies = CodexQuestionReply(socketPath: argument("--codex-question-socket")
         ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/ipc/ipc.sock").path)
     private lazy var approvalStream = CodexApprovalStream(path: argument("--codex-question-socket")
@@ -1967,9 +1968,14 @@ final class AppModel: ObservableObject {
         pruneQuestionNotifications()
         errorText = error
         harnessStateObserved = true
-        if !deepSeekHarnessIdle && windowPeek.isRunning {
+        if !deepSeekHarnessIdle {
+            // Work takes priority over automatic rest, even before its first caption.
+            // Explicit sleep previews retain their own stop/cancel lifecycle.
             windowPeekIdle.reset()
-            windowPeek.stop(reason:"绑定的 Harness 已开始工作 · 恢复工作展示")
+            if automaticSleep { stopSleepDemo() }
+            if windowPeek.isRunning {
+                windowPeek.stop(reason:"绑定的 Harness 已开始工作 · 恢复工作展示", immediate:true)
+            }
         }
         if pendingWindowPeekPreview {
             let previewSeat = pendingWindowSeatPreview
@@ -1985,7 +1991,7 @@ final class AppModel: ObservableObject {
             let pinned = !selection.isEmpty && selected.map(captionGroup) == id ? selection : nil
             guard let session = SessionSelection.choose(group, pinned: pinned) else { continue }
             let active = session.active && Date().timeIntervalSince(session.activity) < 3600
-            let recent = session.displayCaption(showAnswers: showAnswers).map { Date().timeIntervalSince($0.date) < 90 } ?? false
+            let recent = session.displayCaption(showAnswers: showAnswers, showTools: showTools).map { Date().timeIntervalSince($0.date) < 90 } ?? false
             guard states[id] != nil || active || recent || group.contains(where: { !$0.pendingQuestions.isEmpty })
                 || selected.map(captionGroup) == id else { continue }
             let state = states[id] ?? ProjectCaptionState(session: session)
@@ -2070,8 +2076,7 @@ final class AppModel: ObservableObject {
         switch session.source {
         case .codex: return conversationOpener(threadID: session.id)
         case .deepseek:
-            guard let url = URL(string: "dsh://open") else { return nil }
-            return { NSWorkspace.shared.open(url) ? nil : "无法打开 DeepSeek Harness，请确认已安装桌面应用。" }
+            return { HarnessConversationNavigator.shared.open(sessionID: session.id) }
         case .claude:
             return { ClaudeConversationNavigator.shared.open(sessionID: session.id) }
         case .opencode:
@@ -2125,7 +2130,7 @@ final class AppModel: ObservableObject {
         if !demoMode || isolatedActionPreview {
             if !demoMode { currentText = focused?.text ?? (errorText ?? "字幕已就绪，等待下一条思考或进度…") }
             let candidates = sessions.filter { session in
-                session.source == .codex && (selection.isEmpty || captionGroup(session) == focusedID)
+                (session.source == .codex || session.source == .deepseek) && (selection.isEmpty || captionGroup(session) == focusedID)
                     && session.pendingQuestions.contains { !submittedQuestions.contains(session.id + ":" + $0.id)
                         && !closedQuestions.contains(session.id + ":" + $0.id) }
             }
@@ -2149,7 +2154,7 @@ final class AppModel: ObservableObject {
             // Keep the current reply draft mounted, but never let it hide a
             // permission request from another chat. Show one additional approval.
             let extraApproval = pending.filter {
-                $0.2 != nil && $0.0.id + ":" + $0.1.id != displayedQuestion
+                $0.1.approval && $0.0.id + ":" + $0.1.id != displayedQuestion
             }.max { $0.1.date < $1.1.date }
             let displayedPending = (chosen.map { [$0] } ?? []) + (extraApproval.map { [$0] } ?? [])
             let questionSessions = displayedPending.map { $0.0 }
@@ -2161,6 +2166,7 @@ final class AppModel: ObservableObject {
                       state.active || !autoHide || Date() < state.hideAt else { return nil }
                 return OverlayItem(id: id, text: state.text, header: state.header, title: state.session.headerName,
                     active: state.active, mascot: CaptionMascot(rawValue: state.session.source.preferenceID),
+                    completed: !state.active && state.session.outcome == .completed,
                     typewriterID: typewriterEnabled ? state.typewriterID : nil,
                     typewriterCharactersPerSecond: typewriterCharactersPerSecond,
                     averageSpeed: state.session.source == .codex ? codexAverageSpeeds[state.session.id]
@@ -2187,10 +2193,10 @@ final class AppModel: ObservableObject {
                     taskSounds.playQuestion(title: session.headerName, requestID: key)
                 }
                 items.append(OverlayItem(id: approval?.key ?? captionGroup(session), text: request.questions[0].title,
-                    header: "Codex · " + (request.approval ? "等待审批 · " : "等待回复 · ") + session.headerName, title: session.headerName,
-                    active: false, mascot: .codex, question: request,
+                    header: request.applicationName + " · " + (request.approval ? "等待审批 · " : "等待回复 · ") + session.headerName, title: session.headerName,
+                    active: false, mascot: CaptionMascot(rawValue: session.source.preferenceID), question: request,
                     averageSpeed: codexAverageSpeeds[session.id], quotaText: codexQuota?.displayText(),
-                    onOpenConversation: Self.conversationOpener(threadID: session.id),
+                    onOpenConversation: Self.conversationOpener(session: session),
                     onQuestionClose: { [weak self] in
                         guard let self else { return }
                         self.closedQuestions.insert(key)
@@ -2208,11 +2214,16 @@ final class AppModel: ObservableObject {
                             if case .success = result, let self {
                                 self.submittedQuestions.append(key)
                                 if self.submittedQuestions.count > 64 { self.submittedQuestions.removeFirst() }
-                                self.states[captionGroup(session)]?.didReplyToQuestion(approval: approval != nil)
+                                self.states[captionGroup(session)]?.didReplyToQuestion(approval: request.approval)
                                 self.redraw()
                             }
                         }
-                        if let approval {
+                        if request.externalQuestion {
+                            self.harnessApprovalReplies.submitQuestion(sessionID:session.id, request:request, answers:answers, completion:done)
+                        } else if request.externalApproval {
+                            self.harnessApprovalReplies.submit(sessionID: session.id, request: request,
+                                choice: answers[request.questions[0].id] ?? "", completion: done)
+                        } else if let approval {
                             self.questionReplies.submitApproval(approval, choice: answers[request.questions[0].id] ?? "", completion: done)
                         } else { self.questionReplies.submit(threadID: session.id, request: request, answers: answers, completion: done) }
                     }))
@@ -2246,6 +2257,16 @@ final class AppModel: ObservableObject {
                 restingMascots.insert(deepSeekSource)
             }
         }
+        let thinkingMascots: Set<CaptionMascot> = enabled && !onboardingActive && (!demoMode || isolatedActionPreview)
+            ? Set(sessions.compactMap { session in
+                guard (session.active || session.runningSubagentCount > 0),
+                      Date().timeIntervalSince(session.activity) < 3600,
+                      selection.isEmpty || captionGroup(session) == focusedID,
+                      let mascot = CaptionMascot(rawValue: session.source.preferenceID),
+                      effectiveCharacterBindings[mascot] != nil,
+                      !isolatedActionPreview || mascot != demoMascot else { return nil }
+                return mascot
+            }) : []
         if enabled { restingMascots.formUnion(rainShelter.sources) }
         if onboardingActive { items = []; restingMascots.formUnion(effectiveCharacterBindings.keys) }
         overlays.update(enabled ? items : [], font: fontSize, opacity: opacity, bottom: bottom,
@@ -2256,7 +2277,7 @@ final class AppModel: ObservableObject {
                         audioMascots: enabled && singingDemoStartedAt != nil ? [deepSeekSource]
                             : enabled && (mouthDemoStartedAt != nil || mouthTransitionDemoStartedAt != nil) ? (isolatedActionPreview ? [demoMascot] : [.codex, .deepseek])
                             : enabled && audioEnabled && audioRunning ? audioSources : [],
-                        restingMascots: restingMascots,
+                        restingMascots: restingMascots, thinkingMascots: thinkingMascots,
                         characterBindings: effectiveCharacterBindings,
                         fallbackMetrics: [
                             .deepseek: OverlayHoverMetrics(averageSpeed: metricsSession?.harnessResponseSpeed?.tokensPerSecond,

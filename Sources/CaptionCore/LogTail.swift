@@ -70,6 +70,7 @@ public struct SessionSnapshot: Equatable, Sendable {
     public var activity: Date
     public var caption: Caption?
     public var answer: Caption?
+    public private(set) var lastNonToolCaption: Caption?
     public var readable: Bool
     public var finishedAt: Date?
     public var outcome: TaskOutcome?
@@ -84,6 +85,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         self.path = path; self.id = id; self.project = project; self.active = active
         self.title = title
         self.activity = activity; self.caption = caption; self.readable = readable
+        self.lastNonToolCaption = caption?.kind == .tool ? nil : caption
     }
     public var label: String {
         if !title.isEmpty { return "\(source.rawValue) · \(title) · \(id.suffix(6))" }
@@ -95,7 +97,7 @@ public struct SessionSnapshot: Equatable, Sendable {
         return title.isEmpty ? "未命名对话" : String(title.prefix(10))
     }
     public mutating func resetActivity() {
-        active = false; caption = nil; answer = nil; finishedAt = nil; outcome = nil; currentTurnID = nil
+        active = false; caption = nil; answer = nil; lastNonToolCaption = nil; finishedAt = nil; outcome = nil; currentTurnID = nil
         pendingQuestions = []; questionValidAfter = .distantPast
         codexResponseProjection = CodexResponseSpeedProjection()
         harnessResponseSpeed = nil
@@ -115,14 +117,14 @@ public struct SessionSnapshot: Equatable, Sendable {
         case let .title(title): self.title = title
         case let .started(date, turnID):
             // Questions belong to the current turn, including async prompts.
-            pendingQuestions.removeAll { turnID == nil || $0.turnID == nil || $0.turnID != turnID }
+            pendingQuestions.removeAll { !$0.externalQuestion && (turnID == nil || $0.turnID == nil || $0.turnID != turnID) }
             if turnID == nil || currentTurnID != turnID { questionValidAfter = max(questionValidAfter, date) }
             currentTurnID = turnID
-            active = true; activity = date; caption = nil; answer = nil; finishedAt = nil; outcome = nil
+            active = true; activity = date; caption = nil; answer = nil; lastNonToolCaption = nil; finishedAt = nil; outcome = nil
         case let .finished(date, outcome, turnID):
             if active, let turnID, let currentTurnID, turnID != currentTurnID { return }
             active = false; activity = max(activity, date); finishedAt = date; self.outcome = outcome
-            pendingQuestions.removeAll { turnID == nil || $0.turnID == nil || $0.turnID == turnID }
+            pendingQuestions.removeAll { !$0.externalQuestion && (turnID == nil || $0.turnID == nil || $0.turnID == turnID) }
         case let .question(request):
             // Desktop async prompts are actionable only while their turn is
             // running. Completion must also reject delayed duplicate items.
@@ -140,18 +142,20 @@ public struct SessionSnapshot: Equatable, Sendable {
             pendingQuestions.removeAll { $0.questions.allSatisfy { ids.contains($0.id) } }
         case let .userContinued(date):
             questionValidAfter = max(questionValidAfter, date)
-            pendingQuestions.removeAll { $0.date <= date }
+            pendingQuestions.removeAll { !$0.externalQuestion && $0.date <= date }
         case let .caption(value):
             if value.kind == .answer {
                 if answer?.text != value.text { answer = value }
             } else {
+                if value.kind != .tool { lastNonToolCaption = value }
                 if caption?.text != value.text || caption?.kind != value.kind { caption = value }
                 active = true
             }
             activity = max(activity, value.date)
         }
     }
-    public func displayCaption(showAnswers: Bool) -> Caption? {
+    public func displayCaption(showAnswers: Bool, showTools: Bool = true) -> Caption? {
+        let caption = !showTools && self.caption?.kind == .tool ? lastNonToolCaption : self.caption
         let latest: Caption?
         if showAnswers, let answer {
             latest = caption.map { $0.date > answer.date ? $0 : answer } ?? answer

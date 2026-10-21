@@ -321,6 +321,83 @@ final class CaptionCoreTests {
         XCTAssertEqual(CaptionText.pages("短句"), ["短句"])
     }
 
+    func testHiddenToolsRetainCurrentTurnThought() {
+        let now = Date()
+        for source in [SessionSource.codex, .deepseek] {
+            var session = SessionSnapshot(path: "hidden-tools", active: true)
+            session.source = source
+            session.apply(.started(now.addingTimeInterval(-600)))
+            let thought = Caption(text: "先核对数据，再整理结果。", kind: .reasoning, date: now.addingTimeInterval(-500))
+            let tool = Caption(text: "正在运行：检查数据", kind: .tool, date: now)
+            session.apply(.caption(thought)); session.apply(.caption(tool))
+            XCTAssertEqual(session.displayCaption(showAnswers: false), tool)
+            XCTAssertEqual(session.displayCaption(showAnswers: false, showTools: false), thought)
+            let answer = Caption(text: "最终结果", kind: .answer, date: now.addingTimeInterval(1))
+            session.apply(.caption(answer))
+            XCTAssertEqual(session.displayCaption(showAnswers: true, showTools: false), answer)
+            XCTAssertEqual(session.displayCaption(showAnswers: false, showTools: false), thought)
+            session.apply(.started(now.addingTimeInterval(2)))
+            session.apply(.caption(tool))
+            XCTAssertNil(session.displayCaption(showAnswers: false, showTools: false))
+            session.resetActivity()
+            XCTAssertNil(session.lastNonToolCaption)
+        }
+    }
+
+    func testHarnessApprovalLifecycle() throws {
+        let parser = HarnessEventParser()
+        var session = SessionSnapshot(path: "approval-fixture")
+        session.source = .deepseek
+        parser.parse(try harness("turn/start", [:])).forEach { session.apply($0) }
+        let asked = try harness("approval/asked", ["id": "permission-1", "toolName": "bash",
+            "callId": "call-1", "reason": "需要写入工作区外的目录"])
+        parser.parse(asked).forEach { session.apply($0) }
+        parser.parse(asked).forEach { session.apply($0) }
+        XCTAssertEqual(session.pendingQuestions.count, 1)
+        let request = session.pendingQuestions[0]
+        XCTAssertTrue(request.approval && request.externalApproval)
+        XCTAssertEqual(request.applicationName, "DSH")
+        XCTAssertEqual(request.approvalContent?.reason, "需要写入工作区外的目录")
+        parser.parse(try harness("approval/decided", ["id": "other", "outcome": "denied"])).forEach { session.apply($0) }
+        XCTAssertEqual(session.pendingQuestions.count, 1)
+        parser.parse(try harness("approval/decided", ["id": "permission-1", "outcome": "allowed-once"])).forEach { session.apply($0) }
+        XCTAssertTrue(session.pendingQuestions.isEmpty)
+        parser.parse(asked).forEach { session.apply($0) }
+        parser.parse(try harness("turn/end", [:])).forEach { session.apply($0) }
+        XCTAssertTrue(session.pendingQuestions.isEmpty)
+        XCTAssertTrue(parser.parse(try harness("approval/asked", ["id": "missing-fields"])).isEmpty)
+    }
+
+    func testHarnessQuestionLifecycle() throws {
+        let parser = HarnessEventParser()
+        var session = SessionSnapshot(path:"questions")
+        let rows: [[String:Any]] = [["id":"taxonomy","question":"分类方式","options":[["label":"A","description":"说明"],["label":"B"]]],
+            ["id":"source","question":"出处字段","options":[["label":"要"],["label":"不要"]]]]
+        let args = String(decoding:try JSONSerialization.data(withJSONObject:["questions":rows]),as:UTF8.self)
+        parser.parse(try harness("turn/start",[:])).forEach { session.apply($0) }
+        let asked = try harness("tool/call",["name":"ask_user_question","callId":"call-question","arguments":args])
+        parser.parse(asked).forEach { session.apply($0) }
+        parser.parse(asked).forEach { session.apply($0) }
+        XCTAssertEqual(session.pendingQuestions.count,1)
+        XCTAssertEqual(session.pendingQuestions.first?.questions.count,2)
+        XCTAssertEqual(session.pendingQuestions.first?.questions[0].descriptions,["说明",""])
+        XCTAssertTrue(session.pendingQuestions.first?.externalQuestion == true)
+        XCTAssertEqual(session.pendingQuestions.first?.applicationName,"DSH")
+        parser.parse(try harness("tool/result",["message":["toolCallId":"call-question","content":[["type":"text","text":"{\"pending\":true}"]]]])).forEach { session.apply($0) }
+        XCTAssertEqual(session.pendingQuestions.count,1)
+        parser.parse(try harness("turn/end",[:])).forEach { session.apply($0) }
+        XCTAssertEqual(session.pendingQuestions.count,1)
+        parser.parse(try harness("user/message",["source":["kind":"user-question-reply","callId":"other"]])).forEach { session.apply($0) }
+        XCTAssertEqual(session.pendingQuestions.count,1)
+        parser.parse(try harness("user/message",["source":["kind":"user-question-reply","callId":"call-question"]])).forEach { session.apply($0) }
+        XCTAssertTrue(session.pendingQuestions.isEmpty)
+        parser.parse(try harness("turn/start",[:])).forEach { session.apply($0) }
+        parser.parse(asked).forEach { session.apply($0) }
+        XCTAssertEqual(session.pendingQuestions.count,1)
+        parser.parse(try harness("tool/result",["message":["source":["callId":"call-question"],"content":[]]])).forEach { session.apply($0) }
+        XCTAssertTrue(session.pendingQuestions.isEmpty)
+    }
+
     func testHarnessPackedReasoningAndMessageBoundaries() throws {
         let parser = HarnessEventParser()
         var session = SessionSnapshot(path: "harness")
@@ -352,6 +429,17 @@ final class CaptionCoreTests {
         _ = parser.parse(child)
         XCTAssertTrue(parser.isSubagent)
         XCTAssertEqual(parser.parentSessionID, "fixture")
+        // A seeded main chat has ancestry without being a delegated agent.
+        for version in [0, 3, 4] {
+            parser.reset()
+            let fork = try JSONSerialization.data(withJSONObject: ["type": "session", "version": version,
+                "id": "forked-main", "delegationDepth": 0, "parentSession": "fixture", "isSeeded": true])
+            var forked = SessionSnapshot(path: "fork")
+            parser.parse(fork).forEach { forked.apply($0) }
+            XCTAssertFalse(parser.isSubagent)
+            XCTAssertNil(parser.parentSessionID)
+            XCTAssertEqual(forked.id, "forked-main")
+        }
         for version in [3, 4] {
             parser.reset()
             var modern = SessionSnapshot(path: "modern")
@@ -492,6 +580,9 @@ enum CoreChecks {
         try tests.testTailDropsPartialHistoricalFirstLine()
         try tests.testTailIdleCostAndInvalidation()
         tests.testPagesPreserveGraphemesAndDoNotLoseText()
+        tests.testHiddenToolsRetainCurrentTurnThought()
+        try tests.testHarnessApprovalLifecycle()
+        try tests.testHarnessQuestionLifecycle()
         try tests.testHarnessPackedReasoningAndMessageBoundaries()
         try tests.testHarnessToolsAndPrivateInputs()
         tests.testHarnessMigrationArtifactsSelectOneVersion()

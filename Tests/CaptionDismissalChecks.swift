@@ -33,5 +33,18 @@ struct CaptionDismissalChecks {
         state.dismissCaption()
         session.path = "/fixture/other"; receive()
         check(!state.isDismissed, "another session does not inherit a dismissed caption")
+        var working = SessionSnapshot(path: "/fixture/hidden-tool")
+        working.source = .deepseek
+        working.apply(.started(Date().addingTimeInterval(-600)))
+        working.apply(.caption(Caption(text: "保留上一句思考。", kind: .reasoning, date: Date().addingTimeInterval(-500))))
+        working.apply(.caption(Caption(text: "正在编辑：result.json", kind: .tool, date: Date())))
+        let restarted = ProjectCaptionState(session: working)
+        restarted.receive(working, answers: true, tools: false, font: 24)
+        check(restarted.active && restarted.text == "保留上一句思考。", "restart during a long hidden tool retains the current-turn thought older than 90 seconds")
+        restarted.receive(working, answers: true, tools: true, font: 24)
+        check(restarted.text == "正在编辑：result.json", "enabling tools restores their current caption")
+        restarted.receive(working, answers: true, tools: false, font: 24)
+        check(restarted.text == "保留上一句思考。", "disabling tools immediately restores the thought")
+
     }
 }

@@ -5,6 +5,7 @@ public struct UserQuestion: Equatable, Sendable {
     public let title: String
     public let options: [String]
     public let descriptions: [String]
+    public var multiSelect: Bool = false
 }
 
 public struct ApprovalContent: Equatable, Sendable {
@@ -19,6 +20,9 @@ public struct UserQuestionRequest: Equatable, Sendable {
     public let asynchronous: Bool
     public let questions: [UserQuestion]
     public let date: Date
+    public var externalApproval: Bool = false
+    public var externalQuestion: Bool = false
+    public var applicationName: String { externalApproval || externalQuestion ? "DSH" : "Codex" }
     public var approval: Bool = false
     public var approvalContent: ApprovalContent? = nil
 
@@ -46,7 +50,8 @@ public struct UserQuestionRequest: Equatable, Sendable {
                   descriptions.allSatisfy({ $0.utf8.count <= 8_192 }) else { return nil }
             let questionID = asynchronous ? asyncQuestionID(itemID: id, index: index) : row["id"] as? String ?? ""
             guard !questionID.isEmpty, !questions.contains(where: { $0.id == questionID }) else { return nil }
-            questions.append(UserQuestion(id: questionID, title: title, options: options, descriptions: descriptions))
+            questions.append(UserQuestion(id: questionID, title: title, options: options, descriptions: descriptions,
+                multiSelect: row["multi_select"] as? Bool ?? row["multiSelect"] as? Bool ?? false))
         }
         return Self(id: id, turnID: turnID, asynchronous: asynchronous, questions: questions, date: date)
     }
