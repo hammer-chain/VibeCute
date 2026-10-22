@@ -2,10 +2,12 @@ import AppKit
 import SwiftUI
 import CaptionCore
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPopoverDelegate {
     private var model: AppModel!
     private var statusItem: NSStatusItem!
     private let popover = NSPopover()
+    private var menuLocalClickMonitor: Any?
+    private var menuGlobalClickMonitor: Any?
     private var detachedSettingsWindow: NSWindow?
     private var settingsDetached = false
     private var developerWindow: NSWindow?
@@ -28,6 +30,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             button.toolTip = "VibeCute · Codex / DeepSeek Harness"
         }
         popover.behavior = .transient
+        popover.delegate = self
         popover.animates = false
         popover.appearance = NSAppearance(named: .darkAqua)
         let menuController = NSHostingController(rootView: MenuPanelView(model: model,
@@ -159,7 +162,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         NSApp.activate(ignoringOtherApps: true)
+        monitorMenuOutsideClicks()
     }
+
+    private func monitorMenuOutsideClicks() {
+        stopMonitoringMenuClicks()
+        guard popover.isShown else { return }
+        let clicks: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        // Same-app character panels do not deactivate the app, so .transient alone
+        // misses them. Return the event unchanged so the outside target still receives it.
+        menuLocalClickMonitor = NSEvent.addLocalMonitorForEvents(matching: clicks) { [weak self] event in
+            self?.dismissMenuIfOutside(event)
+            return event
+        }
+        menuGlobalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: clicks) { [weak self] event in
+            self?.dismissMenuIfOutside(event)
+        }
+    }
+
+    private func dismissMenuIfOutside(_ event: NSEvent) {
+        guard popover.isShown, let menuWindow = popover.contentViewController?.view.window else { return }
+        // Preserve controls and their child popups, even when they extend beyond the menu.
+        var target = event.window
+        while let window = target {
+            if window === menuWindow { return }
+            target = window.parent
+        }
+        let point = event.window?.convertPoint(toScreen: event.locationInWindow) ?? event.locationInWindow
+        if menuWindow.frame.contains(point) { return }
+        if let button = statusItem.button, let window = button.window,
+           window.convertToScreen(button.convert(button.bounds, to: nil)).contains(point) {
+            return // The status-item action already toggles the menu.
+        }
+        popover.performClose(nil)
+    }
+
+    private func stopMonitoringMenuClicks() {
+        if let monitor = menuLocalClickMonitor { NSEvent.removeMonitor(monitor) }
+        if let monitor = menuGlobalClickMonitor { NSEvent.removeMonitor(monitor) }
+        menuLocalClickMonitor = nil; menuGlobalClickMonitor = nil
+    }
+
+    func popoverDidClose(_ notification: Notification) { stopMonitoringMenuClicks() }
+
+    func applicationWillTerminate(_ notification: Notification) { stopMonitoringMenuClicks() }
 
     func windowWillClose(_ notification: Notification) {
         guard let window = notification.object as? NSWindow else { return }

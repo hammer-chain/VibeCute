@@ -183,6 +183,8 @@ struct SettingsView: View {
       }
       #endif
       if source == .deepseek {
+        DSHBridgeSettingsView(bridge: model.dshBridge)
+        Divider()
         HStack {
           Text("普通余额提醒阈值（元）")
           TextField(

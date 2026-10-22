@@ -18,7 +18,8 @@
     "DeepSeekThinking",
     "OrangeHoodieThinking",
     "CodexThinking",
-    "OpenCodeNavigation"
+    "OpenCodeNavigation",
+    "DSHBridge"
   ],
   "resource_files": [
     "LipVowels.json",

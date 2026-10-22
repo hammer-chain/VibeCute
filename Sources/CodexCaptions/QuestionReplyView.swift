@@ -19,9 +19,11 @@ final class QuestionReplyView: NSView {
     private var request: UserQuestionRequest?
     private var page = 0
     private var answers: [String: String] = [:]
+    private var multiAnswers: [String: Set<Int>] = [:]
     private var selections: [String: Int] = [:]
     private var submitting = false
     private var uncertain = false
+    private var feedback = ""
     private var generation = UUID()
     private var onSubmit: (([String: String], @escaping (Result<Void, Error>) -> Void) -> Void)?
     private var onOpenConversation: (() -> String?)?
@@ -46,7 +48,7 @@ final class QuestionReplyView: NSView {
     private var contentWidth: CGFloat = 0
     private var repliesInCodex: Bool {
         guard let request, !request.approval, request.questions.indices.contains(page) else { return false }
-        return request.questions[page].options.isEmpty || request.questions[page].multiSelect
+        return request.questions[page].options.isEmpty || (request.questions[page].multiSelect && !request.externalQuestion)
     }
 
     init() {
@@ -98,8 +100,8 @@ final class QuestionReplyView: NSView {
         heading.stringValue = title.isEmpty ? request.applicationName + " 对话" : title
         guard self.request != request else { updateControls(); return }
         close.toolTip = "关闭此气泡；仍可在 " + request.applicationName + " 中处理请求"
-        self.request = request; page = 0; answers = [:]; selections = [:]
-        submitting = false; uncertain = false; generation = UUID(); status.stringValue = ""
+        self.request = request; page = 0; answers = [:]; multiAnswers = [:]; selections = [:]
+        submitting = false; uncertain = false; generation = UUID(); feedback = ""
         setAccessibilityLabel((request.applicationName + (request.approval ? " 权限审批 · " : " 提问 · ")) + title)
         contentWidth = 0; rebuildPage(); needsLayout = true
         // Focus is opt-in for the isolated native fixture, never for a real request.
@@ -219,7 +221,7 @@ final class QuestionReplyView: NSView {
                 let button = BubbleReplyButton(title: option, target: self, action: #selector(selectChoice(_:)))
                 button.isChoice = true; button.subtitle = question.descriptions[index]
                 button.accentHue = bubbleRenderer?.themeHue ?? 0.57
-                button.setButtonType(.radio); button.tag = index; button.font = .systemFont(ofSize: 13, weight: .medium)
+                button.setButtonType(question.multiSelect ? .switch : .radio); button.tag = index; button.font = .systemFont(ofSize: 13, weight: .medium)
                 let textWidth = width - 50
                 let titleHeight = ceil((option as NSString).boundingRect(with: NSSize(width: textWidth, height: .greatestFiniteMagnitude),
                     options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: [.font: button.font!]).height)
@@ -227,7 +229,8 @@ final class QuestionReplyView: NSView {
                     with: NSSize(width: textWidth, height: .greatestFiniteMagnitude), options: [.usesLineFragmentOrigin, .usesFontLeading],
                     attributes: [.font: NSFont.systemFont(ofSize: 11)]).height) + 4
                 button.frame = NSRect(x: 0, y: top, width: width, height: max(38, titleHeight + detailHeight + 18))
-                button.state = selections[question.id] == index ? .on : .off
+                button.state = question.multiSelect ? (multiAnswers[question.id, default: []].contains(index) ? .on : .off)
+                    : (selections[question.id] == index ? .on : .off)
                 content.addSubview(button); choiceButtons.append(button); top += button.frame.height + 8
             }
         }
@@ -251,14 +254,25 @@ final class QuestionReplyView: NSView {
         allow.title = options.first == "允许本轮" ? "允许本轮" : "允许一次"
         allow.toolTip = request?.questions.first?.descriptions.first
         deny.isEnabled = !submitting && !uncertain; allow.isEnabled = deny.isEnabled; scope.isEnabled = deny.isEnabled
-        submit.isEnabled = !submitting && !uncertain && request?.questions.allSatisfy { answers[$0.id] != nil } == true
+        let answeredCount = request?.questions.filter(isAnswered).count ?? 0
+        let complete = answeredCount == count
+        let currentAnswered = request?.questions.indices.contains(page) == true
+            && isAnswered(request!.questions[page])
+        submit.title = page + 1 < count ? "下一题" : complete ? "发送回复" : "补全回复"
+        submit.isEnabled = !submitting && !uncertain && currentAnswered
+        if !feedback.isEmpty { status.stringValue = feedback }
+        else if !approval && !repliesInCodex {
+            status.stringValue = complete ? "已选完全部 \(count) 题，点击发送回复。"
+                : currentAnswered ? "已选 \(answeredCount)/\(count) 题，点击\(submit.title)继续。"
+                : "已选 \(answeredCount)/\(count) 题，请先选择第 \(page + 1) 题的答案。"
+        } else { status.stringValue = "" }
         ownReply.isEnabled = onOpenConversation != nil && !submitting
         choiceButtons.forEach { $0.isEnabled = !submitting && !uncertain }
     }
     @objc private func closeBubble() { onClose?() }
     @objc private func openConversation() {
         guard !submitting, let onOpenConversation else { return }
-        status.stringValue = onOpenConversation() ?? ("已打开 " + (request?.applicationName ?? "Codex"))
+        feedback = onOpenConversation() ?? ("已打开 " + (request?.applicationName ?? "Codex")); updateControls()
     }
     private func approvalChoice(_ index: Int) {
         guard let request, request.approval, !submitting, !uncertain,
@@ -285,28 +299,51 @@ final class QuestionReplyView: NSView {
     }
     @objc private func selectChoice(_ button: NSButton) {
         guard let question = request?.questions[page], !submitting, !uncertain else { return }
+        if question.multiSelect {
+            var selected = multiAnswers[question.id, default: []]
+            if selected.contains(button.tag) { selected.remove(button.tag) } else { selected.insert(button.tag) }
+            multiAnswers[question.id] = selected
+            button.state = selected.contains(button.tag) ? .on : .off
+            let values = selected.sorted().map { question.options[$0] }
+            if let data = try? JSONSerialization.data(withJSONObject: values), let encoded = String(data: data, encoding: .utf8) {
+                answers[question.id] = encoded
+            }
+            feedback = ""; updateControls(); return
+        }
         selections[question.id] = button.tag; answers[question.id] = question.options[button.tag]
         choiceButtons.forEach { $0.state = $0 === button ? .on : .off }
-        status.stringValue = ""; updateControls()
+        feedback = ""; updateControls()
     }
-    @objc private func previousPage() { guard page > 0 else { return }; page -= 1; rebuildPage() }
-    @objc private func nextPage() { guard page + 1 < (request?.questions.count ?? 0) else { return }; page += 1; rebuildPage() }
+    private func isAnswered(_ question: UserQuestion) -> Bool {
+        question.multiSelect ? !(multiAnswers[question.id] ?? []).isEmpty
+            : !(answers[question.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    @objc private func previousPage() { guard page > 0, !submitting, !uncertain else { return }; page -= 1; feedback = ""; rebuildPage() }
+    @objc private func nextPage() { guard page + 1 < (request?.questions.count ?? 0), !submitting, !uncertain else { return }; page += 1; feedback = ""; rebuildPage() }
     @objc private func sendReply() {
         guard let request, !submitting, !uncertain else { return }
-        if let index = request.questions.firstIndex(where: { (answers[$0.id] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
-            page = index; rebuildPage(); status.stringValue = "请先选择选项，或到 \(request.applicationName) 自己回复。"; return
+        if !request.approval, page + 1 < request.questions.count {
+            nextPage(); return
         }
-        submitting = true; status.stringValue = "正在提交…"; updateControls()
+        if let index = request.questions.firstIndex(where: { !isAnswered($0) }) {
+            page = index; feedback = ""; rebuildPage(); return
+        }
+        submitting = true; feedback = "正在提交…"; updateControls()
         let currentGeneration = generation
         onSubmit?(answers) { [weak self] result in
             guard let self, self.generation == currentGeneration else { return }
             self.submitting = false
             switch result {
-            case .success: self.status.stringValue = "已发送"; self.uncertain = true
+            case .success: self.feedback = "已发送"; self.uncertain = true
             case let .failure(error):
-                self.status.stringValue = error.localizedDescription
+                self.feedback = error.localizedDescription
                 if let error = error as? QuestionReplyError, case .uncertain = error { self.uncertain = true }
-                if error is HarnessQuestionError { self.uncertain = true }
+                if let error = error as? HarnessQuestionError {
+                    switch error {
+                    case .stale, .uncertain: self.uncertain = true
+                    case .unavailable: break
+                    }
+                }
                 if let error = error as? HarnessApprovalError {
                     switch error {
                     case .stale, .uncertain: self.uncertain = true

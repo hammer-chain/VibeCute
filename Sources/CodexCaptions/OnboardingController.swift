@@ -259,6 +259,7 @@ final class OnboardingController: NSObject, ObservableObject, NSWindowDelegate {
         connectionCheckGeneration += 1
         let generation = connectionCheckGeneration
         let roots = model.onboardingHarnessRoots
+        let dshDetected = model.dshBridge.detected
         checkingConnections = true; availableConnectionSources = []; connectionCheckLimited = false
         let operation = BlockOperation()
         operation.addExecutionBlock { [weak self, weak operation] in
@@ -266,7 +267,9 @@ final class OnboardingController: NSObject, ObservableObject, NSWindowDelegate {
             let result = OnboardingHarnessDiscovery.discover(roots: roots, cancelled: { operation.isCancelled })
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.connectionCheckGeneration == generation, self.settings != nil else { return }
-                self.availableConnectionSources = result.available
+                var available = result.available
+                if dshDetected && !available.contains(.deepseek) { available.append(.deepseek) }
+                self.availableConnectionSources = available
                 self.connectionCheckLimited = result.limited; self.checkingConnections = false
                 self.connectionOperation = nil
             }
@@ -322,7 +325,9 @@ private struct OnboardingPermissions: View {
 }
 private struct OnboardingConnection: View {
     @ObservedObject var flow: OnboardingController
+    @ObservedObject private var bridge: DSHBridgeManager
     @State private var source: SessionSource = .codex
+    init(flow: OnboardingController) { self.flow = flow; bridge = flow.model.dshBridge }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("选择想连接的 AI 工具").font(.headline)
@@ -335,8 +340,7 @@ private struct OnboardingConnection: View {
                 Picker("AI 工具", selection: $source) {
                     ForEach(flow.availableConnectionSources, id: \.self) { Text($0.rawValue).tag($0) }
                 }
-                Text("已识别到本地会话记录。连接后持续跟踪工作进度，蓝色大肥鱼会保留现在的位置。")
-                    .foregroundStyle(.secondary)
+                if source == .deepseek { DSHBridgeSettingsView(bridge: flow.model.dshBridge) }
             }
             if flow.connectionCheckLimited {
                 Text("部分目录尚未检查，可在完整设置中指定目录。").font(.caption).foregroundStyle(.secondary)
@@ -345,7 +349,7 @@ private struct OnboardingConnection: View {
             Spacer()
             HStack {
                 if !flow.availableConnectionSources.isEmpty {
-                    Button("连接") {
+                    Button(source == .deepseek && bridge.state != .connected ? "只同步字幕" : "连接") {
                         if flow.availableConnectionSources.contains(source) { flow.connect(source) }
                     }.disabled(flow.checkingConnections || !flow.availableConnectionSources.contains(source))
                         .keyboardShortcut(.defaultAction)

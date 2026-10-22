@@ -35,4 +35,22 @@ assert.equal((await handler(input)).status,'ok');
 assert.equal(submissions,1);
 assert.equal((await handler(input)).status,'stale');
 assert.equal(submissions,1,'A closed card cannot be submitted twice');
+
+// DSH multi-select answers retain the native answer-channel shape while
+// rejecting duplicates, unknown labels, and multiple choices on single-select questions.
+closed=false;
+const multiQuestions=[{id:'tags',question:'需要哪些标签',multiSelect:true,options:[{label:'A',description:''},{label:'B',description:''}]},
+  {id:'format',question:'格式',multiSelect:false,options:[{label:'短',description:''},{label:'长',description:''}]}];
+const multiCard={sessionId:sessionID,callId:id,questions:multiQuestions,getSnapshot:()=>({closed,channel:'waterfall'}),
+  async answer(batch){submissions++;assert.equal(batch.answers.length,2);closed=true;}};
+ctx.uiSession.pendingSnapshot.set(sessionID,multiCard);
+const multiInput={...base,operation:'question-answer',questions:multiQuestions,answers:[
+  {id:'tags',selected:['A','B']},{id:'format',selected:['短']}]};
+assert.equal((await handler({...multiInput,answers:[{id:'tags',selected:['A','A']},multiInput.answers[1]]})).status,'stale');
+assert.equal((await handler({...multiInput,answers:[multiInput.answers[0],{id:'format',selected:['短','长']}]})).status,'stale');
+assert.equal((await handler({...multiInput,questions:[{...multiQuestions[0],multiSelect:false},multiQuestions[1]]})).status,'stale');
+assert.equal(submissions,1);
+assert.equal((await handler(multiInput)).status,'ok');
+assert.equal(submissions,2);
+assert.equal((await handler(multiInput)).status,'stale');
 console.log('PASS: two-question batch, existing live card, exact identities/content/options, no read side effects, stale and duplicate rejection');

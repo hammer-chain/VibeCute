@@ -20,7 +20,8 @@
     "CodexThinking",
     "OpenCodeNavigation",
     "DeepSeekCutout",
-    "CutoutCharacters"
+    "CutoutCharacters",
+    "DSHBridge"
   ],
   "resource_files": [
     "LipVowels.json",

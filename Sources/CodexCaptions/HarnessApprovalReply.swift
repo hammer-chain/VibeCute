@@ -18,7 +18,7 @@ enum HarnessQuestionError: LocalizedError {
         switch self {
         case .stale: return "这组提问已处理或发生变化，请到 DSH 查看。"
         case .uncertain: return "未确认回复结果，请先到 DSH 查看，避免重复提交。"
-        case .unavailable: return "DSH 提问桥接未连接，请到 DSH 回复。"
+        case .unavailable: return "DSH 未连接，请在设置 → AI 工具与角色中修复连接。"
         }
     }
 }
@@ -28,19 +28,33 @@ final class HarnessApprovalReply {
     private let queue = DispatchQueue(label: "captions.dsh.approval", qos: .userInitiated)
     private var busy = false
     private let socketPath: String
-    init(socketPath: String = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dsh/vibecute/approval.sock").path) {
+    init(socketPath: String = DSHBridgePaths.socket) {
         self.socketPath = socketPath
     }
     func submitQuestion(sessionID: String, request: UserQuestionRequest, answers: [String:String],
                         completion: @escaping (Result<Void, Error>) -> Void) {
         guard !busy, request.externalQuestion, !request.questions.isEmpty,
-              request.questions.allSatisfy({ !$0.multiSelect && $0.options.contains(answers[$0.id] ?? "") }) else {
+              request.questions.allSatisfy({ question in
+                  let value = answers[question.id] ?? ""
+                  let values: [String]
+                  if question.multiSelect {
+                      guard let data = value.data(using: .utf8), let decoded = try? JSONSerialization.jsonObject(with: data) as? [String] else { return false }
+                      values = decoded
+                  } else { values = [value] }
+                  return !values.isEmpty && Set(values).count == values.count && values.allSatisfy(question.options.contains)
+              }) else {
             completion(.failure(QuestionReplyError.invalidAnswer)); return
         }
         let questions: [[String:Any]] = request.questions.map {
-            ["id":$0.id, "question":$0.title, "options":zip($0.options,$0.descriptions).map { ["label":$0.0,"description":$0.1] }]
+            ["id":$0.id, "question":$0.title, "multiSelect":$0.multiSelect,
+             "options":zip($0.options,$0.descriptions).map { ["label":$0.0,"description":$0.1] }]
         }
-        let batch: [[String:Any]] = request.questions.map { ["id":$0.id,"selected":[answers[$0.id]!]] }
+        let batch: [[String:Any]] = request.questions.map { question in
+            let value = answers[question.id] ?? ""
+            let values = question.multiSelect
+                ? ((try? JSONSerialization.jsonObject(with: Data(value.utf8))) as? [String] ?? []) : [value]
+            return ["id":question.id,"selected":values]
+        }
         busy = true
         queue.async {
             var sent = false
@@ -52,6 +66,7 @@ final class HarnessApprovalReply {
                 let response = try connection.bridgeExchange(["version":1,"operation":"question-answer", "sessionID":sessionID,
                     "id":request.id,"questions":questions,"answers":batch])
                 if response["status"] as? String == "stale" { throw HarnessQuestionError.stale }
+                if response["status"] as? String == "unavailable" { throw HarnessQuestionError.unavailable }
                 guard response["status"] as? String == "ok", response["id"] as? String == request.id else {
                     throw HarnessQuestionError.uncertain
                 }

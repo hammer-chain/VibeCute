@@ -593,6 +593,7 @@ final class AppModel: ObservableObject {
     private var monitor: SessionMonitor?
     private var doubaoReader: DoubaoVisibleReader?
     private let harnessApprovalReplies = HarnessApprovalReply()
+    let dshBridge = DSHBridgeManager()
     private lazy var questionReplies = CodexQuestionReply(socketPath: argument("--codex-question-socket")
         ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/ipc/ipc.sock").path)
     private lazy var approvalStream = CodexApprovalStream(path: argument("--codex-question-socket")

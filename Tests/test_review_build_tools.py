@@ -17,6 +17,14 @@ def module(name):
 
 
 class SourceTests(unittest.TestCase):
+    def test_dsh_bridge_is_bundled_in_both_profiles(self):
+        for name in ['index.mjs', 'client.js', 'package.json']:
+            self.assertEqual((ROOT / 'Integrations/DSHApprovalBridge' / name).read_bytes(),
+                             (ROOT / 'Sources/CodexCaptions/Resources/DSHBridge' / name).read_bytes())
+        for name in ['development', 'release']:
+            profile = json.loads((ROOT / 'config/build-profiles' / (name+'.json')).read_text())
+            self.assertIn('DSHBridge', profile['resource_directories'])
+
     def test_audio_resources_reach_both_signed_profiles(self):
         # SwiftPM debug tests can pass while the explicit signed-app assembler
         # silently omits a sound. Check the two independent resource manifests.

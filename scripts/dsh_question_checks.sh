@@ -18,4 +18,4 @@ swiftc -module-cache-path .build/clang-cache -parse-as-library -I "$bin/Modules"
     -Xcc "-fmodule-map-file=$bin/BTrackBridge.build/module.modulemap" \
     -Xcc "-fmodule-map-file=$bin/BeatNetBridge.build/module.modulemap" \
     Tests/DSHQuestionNativeChecks.swift "${objects[@]}" -framework Accelerate -lc++ -lsqlite3 -o .build/dsh-question-native-checks
-.build/dsh-question-native-checks --log "$1"
+.build/dsh-question-native-checks "$@"

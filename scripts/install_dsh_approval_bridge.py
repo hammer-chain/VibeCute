@@ -13,9 +13,9 @@ profile = args.profile.expanduser().resolve()
 patch = profile / 'cordis.patch.yml'
 original = patch.read_text()
 source = Path(__file__).resolve().parent.parent / 'Integrations/DSHApprovalBridge/index.mjs'
-target = profile / 'node_modules/@local/vibecute-approval-bridge-v8/index.mjs'
+target = profile / 'node_modules/@local/vibecute-approval-bridge-v11/index.mjs'
 begin, end = '# BEGIN VibeCute approval bridge', '# END VibeCute approval bridge'
-block = '\n'.join([begin, '- insert:', '    - id: vibecute-approval-bridge-v8', '      name: "@local/vibecute-approval-bridge-v8"', '      config:', '        revision: ' + json.dumps(hashlib.sha256(b''.join((source.parent / n).read_bytes() for n in ['index.mjs', 'client.js', 'package.json'])).hexdigest()[:16]), end])
+block = '\n'.join([begin, '- insert:', '    - id: vibecute-approval-bridge-v11', '      name: "@local/vibecute-approval-bridge-v11"', '      config:', '        revision: ' + json.dumps(hashlib.sha256(b''.join((source.parent / n).read_bytes() for n in ['index.mjs', 'client.js', 'package.json'])).hexdigest()[:16]), end])
 if begin in original:
     start = original.index(begin)
     stop = original.index(end, start) + len(end)

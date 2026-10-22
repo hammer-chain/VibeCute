@@ -14,14 +14,14 @@ final class HarnessConversationNavigator {
         queue.async {
             var message: String?
             do {
-                let path = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".dsh/vibecute/approval.sock").path
+                let path = DSHBridgePaths.socket
                 let connection = try CodexQuestionConnection(path: path)
                 connection.deadline = ProcessInfo.processInfo.systemUptime + 4
                 let result = try connection.bridgeExchange(["version": 1, "operation": "navigate", "sessionID": sessionID])
                 if result["status"] as? String != "ok" || result["sessionID"] as? String != sessionID {
                     message = "DSH 未能切换到对应会话，请确认 DSH 已打开并加载字幕导航插件。"
                 }
-            } catch { message = "无法连接 DSH 会话导航，请打开 DSH 后重试。" }
+            } catch { message = "DSH 连接不可用，请在设置 → AI 工具与角色 → DeepSeek Harness 中修复连接。" }
             DispatchQueue.main.async {
                 self.busy = false
                 if message == nil, let url = URL(string: "dsh://open"), !NSWorkspace.shared.open(url) {

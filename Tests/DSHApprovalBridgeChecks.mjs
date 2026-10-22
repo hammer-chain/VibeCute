@@ -32,7 +32,7 @@ ctx.approval = { ctx, effectivePolicy: () => 'ask',
     req.agent.session.append('approval/decided', { id, outcome }); return outcome;
   })
 };
-await apply(ctx, { socketPath });
+await apply(ctx, { socketPath, revision:'fixture-revision' });
 function exchange(input) {
   return new Promise((resolve, reject) => {
     const socket = net.connect(socketPath); let data = Buffer.alloc(0);
@@ -68,6 +68,22 @@ const fromUI = ask(); await pending();
 uiAnswer('rejected');
 assert.equal(await fromUI.result, 'rejected', 'DSH native UI remains functional without a bridge client');
 assert.equal((await fs.stat(socketPath)).mode & 0o777, 0o600);
+let live = false, clientVersion = 'v11';
+ctx.get = name => name === 'typertGateway' ? {
+  hasLiveClient: () => live,
+  startRemoteEvent: ({event,request,context,resolve}) => {
+    assert.equal(context.agentId,'vibecute-bridge-status');
+    assert.equal(event,'vibecute/status');
+    assert.equal(request.sessionID,undefined,'Health checks never navigate or access a session');
+    resolve({kind:'result',value:{clientVersion}});
+  }
+} : undefined;
+assert.equal((await exchange({version:1,operation:'bridge-status'})).status,'disconnected');
+live=true;
+assert.deepEqual(await exchange({version:1,operation:'bridge-status'}),{
+  status:'ok',revision:'fixture-revision',clientVersion:'v11'});
+clientVersion='v9';
+assert.equal((await exchange({version:1,operation:'bridge-status'})).status,'disconnected');
 for (const cleanup of cleanups.reverse()) cleanup();
 await new Promise(resolve => setTimeout(resolve, 50));
 await fs.rm(folder, { recursive: true, force: true });

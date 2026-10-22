@@ -1,10 +1,14 @@
 window.__ModuleLoader__.load({
-  id: '@local/vibecute-approval-bridge-v8',
+  id: '@local/vibecute-approval-bridge-v11',
   factory() {
     return {
       inject: ['remote', 'uiWorkspace', 'uiSession', 'sessions'],
       apply(ctx) {
         const answeredCards = new WeakSet();
+        ctx.remote.$on('vibecute/status', (_request, next) => {
+          if (globalThis.location?.protocol !== 'dsh-app:' || globalThis.location?.host !== 'app') return next();
+          return {clientVersion:'v11'};
+        });
         ctx.remote.$on('vibecute/question', async (request, next) => {
           if (globalThis.location?.protocol !== 'dsh-app:' || globalThis.location?.host !== 'app') return next();
           const { sessionID, id } = request;
@@ -15,7 +19,7 @@ window.__ModuleLoader__.load({
           const card = ui?.pendingSnapshot?.get(sessionID);
           if (!card || card.sessionId !== sessionID || (card.callId !== undefined && card.callId !== id) || card.review !== undefined
               || typeof card.answer !== 'function' || card.getSnapshot?.().closed || answeredCards.has(card)) return {status:'stale', id};
-          const canonical = rows => rows.map(q => ({id:q.id, question:q.question,
+          const canonical = rows => rows.map(q => ({id:q.id, question:q.question, multiSelect:!!(q.multiSelect ?? q.multi_select),
             options:(q.options ?? []).map(o => ({label:o.label, description:o.description ?? ''}))}));
           const questions = canonical(card.questions);
           if (card.callId === undefined && (!Array.isArray(request.legacyQuestions)
@@ -27,9 +31,11 @@ window.__ModuleLoader__.load({
           const seen = new Set();
           for (const answer of request.answers) {
             const question = card.questions.find(q => q.id === answer.id);
-            if (!question || seen.has(answer.id) || question.multiSelect || question.intent
-                || !Array.isArray(answer.selected) || answer.selected.length !== 1 || answer.custom !== undefined
-                || !(question.options ?? []).some(o => o.label === answer.selected[0])) return {status:'stale', id};
+            if (!question || seen.has(answer.id) || question.intent
+                || !Array.isArray(answer.selected) || answer.selected.length < 1
+                || (!question.multiSelect && answer.selected.length !== 1) || answer.custom !== undefined
+                || new Set(answer.selected).size !== answer.selected.length
+                || !answer.selected.every(label => (question.options ?? []).some(o => o.label === label))) return {status:'stale', id};
             seen.add(answer.id);
           }
           if (card.getSnapshot?.().channel === 'none' || request.signal?.aborted) return {status:'stale', id};

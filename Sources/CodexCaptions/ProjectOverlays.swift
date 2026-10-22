@@ -664,6 +664,8 @@ final class ProjectOverlays {
     private var layerWindowNumbers: Set<Int> = []
     private(set) var layerRestackCount = 0
     private var appearances: [String: Int] = [:]
+    private var bubbleHues: [String: CGFloat] = [:]
+    private var colorItemIDs: Set<String> = []
     private var groupForItem: [String: String] = [:]
     private var groupForSource: [CaptionMascot: String] = [:]
     private var focusedID = ""
@@ -845,7 +847,25 @@ final class ProjectOverlays {
         for item in items.sorted(by: { $0.id < $1.id }) where appearances[item.id] == nil {
             appearances[item.id] = appearances.count
         }
-        let hues = appearances.mapValues { (0.57 + CGFloat($0) * 0.381966011).truncatingRemainder(dividingBy: 1) }
+        let itemIDs = Set(items.map(\.id))
+        if colorItemIDs != itemIDs {
+            // Compare every simultaneous bubble, including bubbles from different
+            // harnesses. Only membership changes allocate colors; caption ticks reuse them.
+            var used: [CGFloat] = []
+            for item in items.sorted(by: { appearances[$0.id]! < appearances[$1.id]! }) {
+                var hue = bubbleHues[item.id]
+                    ?? (0.57 + CGFloat(appearances[item.id]!) * 0.381966011).truncatingRemainder(dividingBy: 1)
+                func separation(_ candidate: CGFloat) -> CGFloat {
+                    used.map { let distance = abs(candidate - $0); return min(distance, 1 - distance) }.min() ?? 1
+                }
+                if separation(hue) < 0.16 {
+                    hue = (0..<36).map { CGFloat($0) / 36 }.max { separation($0) < separation($1) }!
+                }
+                bubbleHues[item.id] = hue; used.append(hue)
+            }
+            colorItemIDs = itemIDs
+        }
+        let hues = bubbleHues
         let screens = NSScreen.screens
         let area = screens.isEmpty ? NSRect.zero
             : screens[min(max(0, screenIndex), screens.count - 1)].visibleFrame

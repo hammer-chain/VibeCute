@@ -33,6 +33,12 @@ VibeCute （目前）是一款使用 Swift、AppKit 和 SwiftUI 构建的原生 
 
 版本更新见 [Changelog](CHANGELOG.md)，安装包见 [GitHub Releases](https://github.com/hammer-chain/VibeCute/releases)。当前构建使用持久的本机证书签名，**尚未经过 Apple 公证**。Intel 构建通过 Rosetta 回归检查；原生 Intel 真机的实时音频性能尚未验收。
 
+### 连接 DeepSeek Harness（DSH）
+
+先安装并打开 DSH，完成它的首次设置。在 VibeCute 新手引导中选择 **DeepSeek Harness**，点击 **启用连接…** 并确认；显示“已连接”后继续。插件随 VibeCute 打包，无需终端或额外安装 Python、Node。也可以选择“只同步字幕”。
+
+以后可在 **设置 → AI 工具与角色 → DeepSeek Harness** 检查状态或点击 **修复连接…**。修复前自动备份 DSH 配置，只补回 VibeCute 条目，保留其他插件。其他工具修改 DSH 配置时，应保留 VibeCute 标记区块；VibeCute 不会在后台自动重写配置。
+
 ## 权限与数据
 
 VibeCute 需要读取用户选择的工具会话目录。涉及截屏、系统音频或麦克风的功能，按所用功能和 macOS 要求申请权限。

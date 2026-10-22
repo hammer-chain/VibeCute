@@ -70,7 +70,7 @@ The bridge also forwards explicit `question-status` and `question-answer` clicks
 to the existing desktop question card. The native UI reads only
 `ask_user_question` arguments, renders one complete batch, and matches session,
 call, question IDs, text, option labels and descriptions before sending it.
-Single-choice batches are supported; free-text-only and multi-select questions
+Single-choice and multi-select batches are supported; free-text-only questions
 keep the DSH reply link. Nothing selects an option until the user clicks it.
 
 Older desktop cards omit their call ID. For those, the host verifies the newest
@@ -85,6 +85,27 @@ polling. Success means the existing DSH answer channel accepted the batch; an
 uncertain result disables repeat submission and directs the user to DSH.
 
 Checks: `node Tests/DSHQuestionChecks.mjs`;
-`bash scripts/dsh_question_checks.sh /absolute/path/to/session.v4.jsonl.zstd`.
+`bash scripts/dsh_question_checks.sh --log /absolute/path/to/session.v4.jsonl.zstd`.
 The native check uses a local callback and never sends the real session answers.
-Module identity v8 also invalidates the desktop's cached v3 client contribution.
+Module identity v11 invalidates older cached client contributions.
+The primary action guides users through all questions before sending the batch.
+
+## Setup in VibeCute
+
+Open **Settings → AI tools and characters → DeepSeek Harness** to enable or repair
+interaction. The same control is available in first-run onboarding, even before
+DSH has produced its first session. Users may choose subtitle tracking alone.
+If the desktop profile is not initialized, open DSH once and check again.
+
+The app bundles all plugin files in both signed profiles; no Python, Node or
+terminal is needed on the receiving machine. Setup backs up the current patch,
+replaces only the VibeCute block, checks for concurrent config changes, and
+refuses symbolic-link destinations. Unchanged installations do not rewrite the
+patch or create another backup. Never restore an entire old patch to repair a
+missing bridge: that could overwrite newer settings for other plugins.
+
+An explicit `bridge-status` request checks host revision and desktop client
+version without selecting a conversation or answering a card. Checks run only
+when setup is shown, the app returns to the foreground while setup is shown, or
+the user requests one. Installing schedules one deferred check; there is no idle
+polling or silent config rewriting.

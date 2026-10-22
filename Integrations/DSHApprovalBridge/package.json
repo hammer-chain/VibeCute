@@ -1,6 +1,6 @@
 {
-  "name": "@local/vibecute-approval-bridge-v8",
-  "version": "0.3.0",
+  "name": "@local/vibecute-approval-bridge-v11",
+  "version": "0.4.1",
   "private": true,
   "type": "module",
   "main": "index.mjs",

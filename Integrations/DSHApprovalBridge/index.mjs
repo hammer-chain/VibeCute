@@ -68,6 +68,22 @@ export async function apply(ctx, config = {}) {
       }));
     } finally { clearTimeout(timer); }
   };
+  // Explicit settings-page check only; no sessions, answers or approvals are touched.
+  const bridgeStatus = async () => {
+    const gateway = ctx.get?.('typertGateway');
+    if (!gateway?.hasLiveClient?.()) return {status:'disconnected', revision:config.revision};
+    const controller = new AbortController(), subject = {};
+    const timer = setTimeout(() => controller.abort(), 2500);
+    try {
+      return await new Promise(resolve => gateway.startRemoteEvent({
+        event:'vibecute/status', request:{agent:subject, signal:controller.signal},
+        context:{value:ctx, subject, agentId:'vibecute-bridge-status'},
+        resolve:result => resolve({status:result.kind === 'result' && result.value?.clientVersion === 'v11' ? 'ok' : 'disconnected',
+          revision:config.revision, clientVersion:result.value?.clientVersion ?? null}),
+        reject:() => resolve({status:'disconnected', revision:config.revision})
+      }));
+    } finally { clearTimeout(timer); }
+  };
   const navigate = async sessionID => {
     const gateway = ctx.get?.('typertGateway');
     if (typeof sessionID !== 'string' || !/^session-[0-9a-f-]{36}$/i.test(sessionID)
@@ -107,6 +123,7 @@ export async function apply(ctx, config = {}) {
         const input = JSON.parse(buffer.subarray(4, size + 4));
         const record = pending.get(key(input.sessionID, input.id));
         if (input.version !== 1) reply = { status: 'incompatible' };
+        else if (input.operation === 'bridge-status') reply = await bridgeStatus();
         else if (input.operation === 'navigate') reply = await navigate(input.sessionID);
         else if (['question-status','question-answer'].includes(input.operation)) reply = await remoteQuestion(input);
         else if (record && !record.claimed && !record.signal?.aborted && record.reason === input.reason && record.toolName === input.toolName
