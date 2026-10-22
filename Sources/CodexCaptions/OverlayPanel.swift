@@ -292,6 +292,25 @@ final class SubtitleView: NSView {
     private var animationTimer: Timer?
     private var requestedMascotAnimating = false
     private var rainShelterThinking = false
+    private var balanceHungryRequested = false
+    private var hungryBasin = HungryBasinMotion()
+    let hungryBasinSound = HungryBasinSound()
+    var balanceHungryFrame: Int? { hungryBasinAllowed ? hungryBasin.frame : nil }
+    private var hungryBasinAllowed: Bool {
+        mascotKind == .deepseek && !usesPinkBear && mode == .character && showsMascot &&
+        screenEdgeDock == nil && !dragReaction.active && sleepSample == nil &&
+        !headPatActive && !performanceActive &&
+        strollSample == nil && rainShelterPose == nil && scootSample == nil &&
+        frontRetreatSample == nil && !hasScootRestPose
+    }
+    func setBalanceHungry(_ enabled: Bool) {
+        let requested = enabled && mascotKind == .deepseek && !usesPinkBear
+        guard requested != balanceHungryRequested else { return }
+        balanceHungryRequested = requested
+        if requested { hungryBasinSound.prepare() }
+        refreshMascotAnimation()
+        needsDisplay = true
+    }
     private var seatedMotionTimer: Timer?
     private var gazeTimer: Timer?
     private var gazeClock: TimeInterval = 0
@@ -428,12 +447,12 @@ final class SubtitleView: NSView {
     }
     var seatedGazePosition: NSPoint { gaze.position }
     var seatedGazeActive: Bool {
-        !headPatActive && showsMascot && mascot?.supportsSeatedGaze == true && mode != .bubble && screenEdgeDock == nil &&
+        balanceHungryFrame == nil && !headPatActive && showsMascot && mascot?.supportsSeatedGaze == true && mode != .bubble && screenEdgeDock == nil &&
         !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && rainShelterPose == nil && scootSample == nil &&
         frontRetreatSample == nil && !hasScootRestPose
     }
     var originalThinkingPoseActive: Bool {
-        !headPatActive && screenEdgeDock == nil && mascotAnimating && audioMouthIndex == nil && mascot?.thinkingFrames.count == 8 &&
+        balanceHungryFrame == nil && !headPatActive && screenEdgeDock == nil && mascotAnimating && audioMouthIndex == nil && mascot?.thinkingFrames.count == 8 &&
         !dragReaction.active && sleepSample == nil && !performanceActive && strollSample == nil && rainShelterPose == nil && scootSample == nil &&
         frontRetreatSample == nil && !hasScootRestPose
     }
@@ -452,6 +471,7 @@ final class SubtitleView: NSView {
             guard let self else { return }
             let now = ProcessInfo.processInfo.systemUptime
             let dt = now - self.gazeClock; self.gazeClock = now
+            guard self.balanceHungryFrame == nil else { return }
             guard let window = self.window, window.isVisible else { return }
             let following = self.seatedGazeActive
             let cursor = self.convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
@@ -986,7 +1006,7 @@ final class SubtitleView: NSView {
         }
         cutoutRenderer = nil
         #endif
-        if usesPinkBear || kind != .deepseek { rainShelterThinking = false; rainShelterPose = nil; strollSample = nil; strollEntryImage = nil; scootSample = nil; frontRetreatSample = nil; frontRetreatEntryImage = nil }
+        if usesPinkBear || kind != .deepseek { hungryBasinSound.stop(); balanceHungryRequested = false; hungryBasin = HungryBasinMotion(); rainShelterThinking = false; rainShelterPose = nil; strollSample = nil; strollEntryImage = nil; scootSample = nil; frontRetreatSample = nil; frontRetreatEntryImage = nil }
         if usesPinkBear { audioMouthIndex = nil; performanceFrameIndex = nil }
         if kind == .orangeHoodie { performanceFrameIndex = nil; dragReaction.reset() }
         refreshGazeTracking()
@@ -995,10 +1015,20 @@ final class SubtitleView: NSView {
     }
 
     private func refreshMascotAnimation() {
-        if showsMascot && (requestedMascotAnimating || rainShelterThinking || screenEdgeDock != nil) {
+        if showsMascot && (requestedMascotAnimating || rainShelterThinking || screenEdgeDock != nil || balanceHungryRequested || hungryBasin.frame != nil) {
             guard animationTimer == nil else { return }
             let timer = Timer(timeInterval: 0.16, repeats: true) { [weak self] _ in
                 guard let self else { return }
+                let hungryVisible = self.window?.isVisible == true && self.hungryBasinAllowed
+                let strike = self.hungryBasin.advance(requested: self.balanceHungryRequested, allowed: hungryVisible)
+                if self.balanceHungryFrame != nil { self.needsDisplay = true }
+                if strike, DeepSeekHungryArtwork.shared.available {
+                    self.displayIfNeeded()
+                    self.hungryBasinSound.strike()
+                } else if !hungryVisible || !self.balanceHungryRequested {
+                    self.hungryBasinSound.stop()
+                }
+                if !self.balanceHungryRequested && self.hungryBasin.frame == nil { self.refreshMascotAnimation() }
                 if self.screenEdgeDock != nil { self.advanceScreenEdgeFrame(); return }
                 self.sequenceIndex = (self.sequenceIndex + 1) % self.playbackSequence.count
                 if (!self.dragReaction.active && self.sleepSample == nil && !self.headPatActive && self.audioMouthIndex == nil && !self.performanceActive && self.strollSample == nil && self.rainShelterPose == nil && self.scootSample == nil && self.frontRetreatSample == nil) { self.needsDisplay = true }
@@ -1007,6 +1037,7 @@ final class SubtitleView: NSView {
             RunLoop.main.add(timer, forMode: .common)
         } else {
             animationTimer?.invalidate(); animationTimer = nil
+            hungryBasinSound.stop()
             sequenceIndex = 0
         }
     }
@@ -1250,6 +1281,10 @@ final class SubtitleView: NSView {
                     at: now, motionAmount: seatedMotionAmount(at: now), thinking: mascotAnimating)
                 context.endTransparencyLayer(); context.restoreGState()
             }
+            return
+        }
+        if let frame = balanceHungryFrame, DeepSeekHungryArtwork.shared.available {
+            DeepSeekHungryArtwork.shared.draw(frame: frame, in: rect)
             return
         }
         mascot.drawSeated(frame: pat?.frame ?? (seatedGazeActive || audioMouthIndex == nil ? mascotFrameIndex : 0),

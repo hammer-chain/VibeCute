@@ -518,6 +518,7 @@ private final class CharacterOverlayGroup {
                 pinkBear: pinkBear,cutoutHair:cutoutHair,allowOutsideScreen:relocating)
         }
         updateCharacter()
+        character.subtitle.setBalanceHungry((fallbackMetrics?.persistent ?? false) || sharedMetrics.contains { $0.1.persistent })
         let metrics = sorted.isEmpty
             ? fallbackMetrics ?? OverlayHoverMetrics(averageSpeed: nil, quotaText: source == "deepseek" ? "账户余额 -" : nil)
             : OverlayHoverMetrics(averageSpeed: primary.averageSpeed, quotaText: primary.quotaText,
@@ -816,6 +817,7 @@ final class ProjectOverlays {
                 restingMascots: Set<CaptionMascot> = [], thinkingMascots: Set<CaptionMascot> = [],
                 characterBindings: [CaptionMascot: CharacterChoice]? = nil,
                 fallbackMetrics: [CaptionMascot: OverlayHoverMetrics] = [:],
+                hungrySoundEnabled: Bool = true, hungrySoundVolume: Double = 0.2,
                 cutoutHair: [CaptionMascot: String] = [:]) {
         // AppKit may swallow mouse-up during a WindowServer drag. Reuse the
         // existing subtitle refresh and only check panels with an active drag.
@@ -955,6 +957,7 @@ final class ProjectOverlays {
                 }
                 return (name, metrics)
             } : []
+            group.character.subtitle.hungryBasinSound.configure(enabled: hungrySoundEnabled, volume: hungrySoundVolume)
             group.update(renderedItems, font: font, opacity: opacity, bottom: bottom,
                          screenIndex: screenIndex, movable: movable, focusedID: focusedID,
                          characterScale: characterScale, centerX: centerX,
@@ -1116,6 +1119,7 @@ final class ProjectOverlays {
                     "animating": c.subtitle.mascotAnimating, "frameIndex": c.subtitle.mascotFrameIndex,
                     "frameCount": c.subtitle.mascotFrameCount,
                     "mouthIndex": c.subtitle.audioMouthIndex ?? -1,
+                    "hungryBasinFrame": c.subtitle.balanceHungryFrame ?? -1,
                     "gazeActive": c.subtitle.seatedGazeActive,
                     "originalThinkingPoseActive": c.subtitle.originalThinkingPoseActive,
                     "gazeX": c.subtitle.seatedGazePosition.x,

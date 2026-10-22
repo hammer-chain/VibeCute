@@ -117,6 +117,7 @@ final class AppModel: ObservableObject {
     private var requestedPreviewCharacter: CharacterChoice?
     private var demoCharacterOverride: CharacterChoice?
     private var hidePreviewCaption = false
+    private var hungryBasinPreview = false
     private var isolatedActionPreview: Bool { demoMode && demoCharacterOverride != nil }
     private var demoMascot: CaptionMascot {
         guard isolatedActionPreview else { return demoDeepSeek ? .deepseek : .codex }
@@ -134,9 +135,13 @@ final class AppModel: ObservableObject {
             developerPreviewStatus = "该角色尚未制作此动作"; return
         }
         requestedPreviewCharacter = developerPreviewCharacter
+        hungryBasinPreview = false
         defer { requestedPreviewCharacter = nil }
         switch action {
         case .thinking: showDemo(deepSeek:true)
+        case .hungryBasin:
+            showDemo(deepSeek:true)
+            hungryBasinPreview = true; hidePreviewCaption = true; redraw()
         case .mouth: showDemo(deepSeek:true); showMouthDemo()
         case .singing: showSingingDemo()
         case .shortAvoidance:
@@ -304,6 +309,7 @@ final class AppModel: ObservableObject {
         redraw(); updateMouth()
     }
     func stopPreview() {
+        hungryBasinPreview = false
         let restoreEnabled = questionPreviewPreviousEnabled
         questionPreviewActive = false; questionPreviewRequest = nil; questionPreviewRevealAt = nil
         questionPreviewPreviousEnabled = nil
@@ -331,9 +337,11 @@ final class AppModel: ObservableObject {
     @Published var taskSoundsEnabled: Bool { didSet {
         save("taskSoundsEnabled", taskSoundsEnabled)
         if !taskSoundsEnabled { taskSounds.stop() }
+        redraw()
     } }
     @Published var taskSoundVolume: Double { didSet {
         save("taskSoundVolume", taskSoundVolume); taskSounds.volume = taskSoundVolume
+        redraw()
     } }
     @Published private(set) var taskSoundStatus = "等待 Codex 任务结果"
     private let taskSounds = TaskOutcomeSoundPlayer()
@@ -2288,12 +2296,16 @@ final class AppModel: ObservableObject {
                                 quotaText: codexQuota?.displayText()),
                             .opencode: OverlayHoverMetrics(averageSpeed: openCodeMetricsSession?.openCodeResponseSpeed?.tokensPerSecond,
                                 quotaText: nil)],
+                        hungrySoundEnabled: taskSoundsEnabled, hungrySoundVolume: taskSoundVolume / 3,
                         cutoutHair: Dictionary(uniqueKeysWithValues: effectiveCharacterBindings.filter {
                             $0.value == .deepseekCutout
                         }.map { binding in
                             (binding.key, binding.key == .companion ? companionHairstyle
                                 : SessionSource.allCases.first { source in source.preferenceID == binding.key.rawValue }.map { cutoutHair(for: $0) } ?? companionHairstyle)
                         }))
+        if enabled && demoMode && hungryBasinPreview {
+            overlays.character(for: demoMascot)?.subtitle.setBalanceHungry(true)
+        }
         let visible = overlays.visibleIDs.contains(focusedID)
         let overlay = overlays.controller(for: focusedID)
         onStatus?(enabled)
