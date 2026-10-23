@@ -109,6 +109,30 @@
           -2,
           105
         ]
+      },
+      {
+        "id": "hair-return",
+        "parent": "head",
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": "left-elbow",
+        "parent": "arm-left",
+        "position": [
+          -1,
+          -109
+        ]
+      },
+      {
+        "id": "left-wrist",
+        "parent": "left-elbow",
+        "position": [
+          -92,
+          -45
+        ]
       }
     ],
     "slots": [
@@ -257,7 +281,7 @@
         "bone": "arm-left",
         "order": 20,
         "category": "clothes",
-        "optional": false
+        "optional": true
       },
       {
         "id": "whale-fin-r",
@@ -313,14 +337,14 @@
         "bone": "torso",
         "order": 21,
         "category": "clothes",
-        "optional": false
+        "optional": true
       },
       {
         "id": "shoulder-ruffle-l",
         "bone": "torso",
         "order": 22,
         "category": "clothes",
-        "optional": false
+        "optional": true
       },
       {
         "id": "rear scalp",
@@ -355,6 +379,55 @@
         "bone": "hair-front",
         "order": 25,
         "category": "hair",
+        "optional": true
+      },
+      {
+        "id": "right-cuff",
+        "bone": "right-elbow",
+        "order": 18,
+        "category": "clothes",
+        "optional": true
+      },
+      {
+        "id": "left-upper",
+        "bone": "arm-left",
+        "order": 20,
+        "category": "clothes",
+        "optional": true
+      },
+      {
+        "id": "left-fore",
+        "bone": "left-elbow",
+        "order": 20,
+        "category": "clothes",
+        "optional": true
+      },
+      {
+        "id": "left-cuff",
+        "bone": "left-elbow",
+        "order": 20,
+        "category": "clothes",
+        "optional": true
+      },
+      {
+        "id": "left-hand",
+        "bone": "left-wrist",
+        "order": 20,
+        "category": "clothes",
+        "optional": true
+      },
+      {
+        "id": "skirt-back",
+        "bone": "root",
+        "order": 2,
+        "category": "clothes",
+        "optional": true
+      },
+      {
+        "id": "skirt-front",
+        "bone": "root",
+        "order": 4,
+        "category": "clothes",
         "optional": true
       }
     ],
@@ -725,6 +798,52 @@
               169.03349282296654,
               912.1275917065391,
               758.609250398724
+            ],
+            "maskOut": [
+              [
+                332,
+                610
+              ],
+              [
+                365,
+                570
+              ],
+              [
+                410,
+                542
+              ],
+              [
+                475,
+                530
+              ],
+              [
+                540,
+                544
+              ],
+              [
+                600,
+                577
+              ],
+              [
+                635,
+                615
+              ],
+              [
+                610,
+                520
+              ],
+              [
+                560,
+                480
+              ],
+              [
+                420,
+                480
+              ],
+              [
+                365,
+                520
+              ]
             ]
           },
           {
@@ -772,6 +891,52 @@
               495.0,
               488.0,
               430.0
+            ],
+            "maskOut": [
+              [
+                332,
+                610
+              ],
+              [
+                365,
+                570
+              ],
+              [
+                410,
+                542
+              ],
+              [
+                475,
+                530
+              ],
+              [
+                540,
+                544
+              ],
+              [
+                600,
+                577
+              ],
+              [
+                635,
+                615
+              ],
+              [
+                610,
+                520
+              ],
+              [
+                560,
+                480
+              ],
+              [
+                420,
+                480
+              ],
+              [
+                365,
+                520
+              ]
             ]
           },
           {
@@ -812,6 +977,182 @@
               535,
               444,
               347
+            ]
+          }
+        ]
+      },
+      {
+        "id": "clothes-claude-code",
+        "title": "Claude Code 工服 · 米白卫衣",
+        "category": "clothes",
+        "attachments": [
+          {
+            "slot": "footwear",
+            "file": "outfits/claude-code/footwear.png",
+            "rect": [
+              365,
+              32,
+              211,
+              80
+            ]
+          },
+          {
+            "slot": "left-cuff",
+            "file": "outfits/claude-code/left-cuff.png",
+            "rect": [
+              448,
+              287,
+              65,
+              71
+            ]
+          },
+          {
+            "slot": "left-fore",
+            "file": "outfits/claude-code/left-fore.png",
+            "rect": [
+              442,
+              262,
+              170,
+              163
+            ]
+          },
+          {
+            "slot": "left-hand",
+            "file": "outfits/claude-code/left-hand.png",
+            "rect": [
+              403,
+              271,
+              95,
+              89
+            ]
+          },
+          {
+            "slot": "left-upper",
+            "file": "outfits/claude-code/left-upper.png",
+            "rect": [
+              524,
+              354,
+              102,
+              137
+            ]
+          },
+          {
+            "slot": "legwear",
+            "file": "outfits/claude-code/legwear.png",
+            "rect": [
+              347,
+              60,
+              236,
+              270
+            ]
+          },
+          {
+            "slot": "right-cuff",
+            "file": "outfits/claude-code/right-cuff.png",
+            "rect": [
+              414,
+              418,
+              72,
+              72
+            ]
+          },
+          {
+            "slot": "right-fore",
+            "file": "outfits/claude-code/right-fore.png",
+            "rect": [
+              322,
+              333,
+              171,
+              177
+            ]
+          },
+          {
+            "slot": "right-upper",
+            "file": "outfits/claude-code/right-upper.png",
+            "rect": [
+              324,
+              366,
+              104,
+              127
+            ]
+          },
+          {
+            "slot": "topwear",
+            "file": "outfits/claude-code/topwear.png",
+            "rect": [
+              312,
+              300,
+              330,
+              265
+            ]
+          },
+          {
+            "slot": "right-hand",
+            "file": "parts/right-hand.png",
+            "rect": [
+              418,
+              444,
+              69,
+              91
+            ]
+          },
+          {
+            "slot": "skirt-back",
+            "file": "outfits/claude-code/skirt-back.png",
+            "rect": [
+              257,
+              210,
+              440,
+              65
+            ]
+          },
+          {
+            "slot": "skirt-front",
+            "file": "outfits/claude-code/skirt-front.png",
+            "rect": [
+              242,
+              197,
+              470,
+              125
+            ]
+          }
+        ],
+        "clothDeformations": [
+          {
+            "slot": "topwear",
+            "driver": "torso",
+            "region": [
+              351,
+              395,
+              260,
+              118
+            ],
+            "waistY": 395,
+            "shoulderY": 477,
+            "rows": 8,
+            "compression": 0.012,
+            "angleLimit": 1.4
+          }
+        ],
+        "slotOrders": {
+          "neck": 6,
+          "right-upper": 4,
+          "left-upper": 4
+        }
+      },
+      {
+        "id": "headwear-claude-code",
+        "title": "Claude Code 橙色星芒",
+        "category": "headwear",
+        "attachments": [
+          {
+            "slot": "headwear",
+            "file": "outfits/claude-code/headwear.png",
+            "rect": [
+              641,
+              738,
+              82,
+              94
             ]
           }
         ]
@@ -1125,6 +1466,63 @@
           "expressions/mouth-shapes/t/frame-07.png",
           "expressions/mouth-shapes/t/frame-08.png"
         ]
+      }
+    ],
+    "decodedByteLimit": 25165824,
+    "motionBounds": [
+      -8,
+      16,
+      1048,
+      1016
+    ],
+    "hairDeformations": [
+      {
+        "slot": "back hair",
+        "driver": "hair-return",
+        "rootY": 830,
+        "tipY": 220,
+        "maxOffset": 12,
+        "rows": 4
+      },
+      {
+        "slot": "front hair",
+        "driver": "hair-return",
+        "rootY": 830,
+        "tipY": 413,
+        "maxOffset": 4,
+        "rows": 4
+      },
+      {
+        "slot": "ahoge",
+        "driver": "hair-return",
+        "rootY": 897,
+        "tipY": 987,
+        "maxOffset": 6,
+        "rows": 4
+      },
+      {
+        "slot": "rear scalp",
+        "driver": "hair-return",
+        "rootY": 830,
+        "tipY": 495,
+        "maxOffset": 6,
+        "rows": 4
+      },
+      {
+        "slot": "ponytail left",
+        "driver": "hair-return",
+        "rootY": 602,
+        "tipY": 235,
+        "maxOffset": 12,
+        "rows": 4
+      },
+      {
+        "slot": "ponytail right",
+        "driver": "hair-return",
+        "rootY": 602,
+        "tipY": 235,
+        "maxOffset": 12,
+        "rows": 4
       }
     ]
   },

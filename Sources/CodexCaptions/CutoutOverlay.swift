@@ -16,16 +16,16 @@ final class CutoutOverlayRenderer {
     private(set) var blink = 0.0
     private(set) var mouth = 0.0
     private(set) var mouthShape: String?
+    private(set) var sampledReferenceFrame: Int?
     private(set) var appearanceError: String?
     var running: Bool { timer != nil }
     var clock: Double { running ? ProcessInfo.processInfo.systemUptime - clockOrigin : stoppedAt }
     var displaySize: CGSize {
-        guard let variant=artwork.rig.variants.first(where:{$0.id==artwork.selection["hair"]}),
-              let b=variant.displayBounds else {return CGSize(width:126,height:184)}
         let rig=artwork.rig
-        let half=max(abs(b[0]-rig.anchor[0]),abs(b[2]-rig.anchor[0]))
+        let b=rig.sharedMotionBounds
+        let half=max(abs(b.minX-rig.anchor[0]),abs(b.maxX-rig.anchor[0]))
         return CGSize(width:max(126,2*half*rig.pointsPerPixel+12),
-                      height:max(184,(b[3]-rig.anchor[1])*rig.pointsPerPixel+20))
+                      height:max(184,(b.maxY-rig.anchor[1])*rig.pointsPerPixel+20))
     }
     var headPatRegion: NSRect {
         guard let view, let index = artwork.player.indices["gaze"] else { return .zero }
@@ -62,14 +62,21 @@ final class CutoutOverlayRenderer {
     func setThinking(_ value: Bool) {
         guard value != thinking else { return }
         thinking = value
-        artwork.player.play(value ? thinkingClip : "idle", at: clock, blink: blink)
+        let clip = artwork.player.clips.first { $0.definition.id == thinkingClip }!
+        artwork.player.play(value ? thinkingClip : "idle", at: clock,
+            transition:value && clip.definition.interpolation == .step ? 0 : 0.25,blink: blink)
+        if value { advanceIfVisible() }
     }
     func setThinkingClip(_ id: String) {
         let playback = MascotAnimation.cutoutCharacter.cutoutPlayback!
         guard ([playback.thinkingClip] + playback.alternativeThinkingClips).contains(id) else { return }
         guard id != thinkingClip else { return }
         thinkingClip = id
-        if thinking { artwork.player.play(id, at: clock, blink: blink) }
+        if thinking {
+            let clip = artwork.player.clips.first { $0.definition.id == id }!
+            artwork.player.play(id, at: clock,transition:clip.definition.interpolation == .step ? 0 : 0.25,blink: blink)
+            advanceIfVisible()
+        }
     }
     func setHair(_ id: String) {
         guard artwork.selection["hair"] != id else { return }
@@ -124,7 +131,19 @@ final class CutoutOverlayRenderer {
         let input = MascotAnimation.cutoutCharacter.cutoutPlayback!.mouthInput(for: view.audioMouthIndex)
         mouth = input.openness; mouthShape = input.shape
         artwork.player.sample(at: time, gaze: gaze.position, mouth: mouth, blink: blink)
-        view.setNeedsDisplay(view.seatedSpriteRect.insetBy(dx: -20*view.layoutScale, dy: -12*view.layoutScale))
+        sampledReferenceFrame=artwork.player.clips[artwork.player.clipIndex].referenceFrame(at:time-artwork.player.startedAt)
+        view.setNeedsDisplay(artwork.motionBounds(anchor:CGPoint(x:rect.midX,y:rect.minY),
+            scale:Double(view.layoutScale)).insetBy(dx:-3,dy:-3))
+        let clip=artwork.player.clips[artwork.player.clipIndex]
+        if clip.definition.interpolation == .step {
+            // Keep the same 30 Hz gaze clock, but wake at a pose boundary too.
+            // Moving the existing timer avoids adding another frame loop.
+            let remaining=clip.remainingFrameTime(at:time-artwork.player.startedAt)-(clock-time)
+            timer?.fireDate=Date(timeIntervalSinceNow:max(0.0001,min(1/30,remaining)))
+        }
+    }
+    private func advanceIfVisible() {
+        if view?.window?.isVisible == true { advance() }
     }
     func draw(in context: CGContext) {
         guard let view else { return }
@@ -137,6 +156,11 @@ final class CutoutOverlayRenderer {
         ["running":running,"ticks":ticks,"thinking":thinking,"clip":thinkingClip,
          "clock":clock,"blink":blink,"mouth":mouth,"mouthShape":mouthShape ?? "default","resourceReads":artwork.resourceReads,
          "decodedImages":artwork.decodedImages,"decodedBytes":artwork.decodedBytes,
+         "decodedByteLimit":artwork.rig.cacheByteLimit,"peakResidentDecodedBytes":artwork.peakResidentDecodedBytes,
+         "releasedDecodedBytes":artwork.releasedDecodedBytes,"cacheHits":artwork.cacheHits,
+         "activeClip":artwork.player.clips[artwork.player.clipIndex].definition.id,
+         "referenceFrame":artwork.player.clips[artwork.player.clipIndex].referenceFrame(at:clock-artwork.player.startedAt) ?? -1,
+         "sampledReferenceFrame":sampledReferenceFrame ?? -1,
          "draws":artwork.drawCount,"drawOperations":artwork.drawOperations,
          "clothForms":artwork.clothPatchImagesBuilt,"hair":artwork.selection["hair"] ?? "",
          "appearanceError":appearanceError ?? ""]

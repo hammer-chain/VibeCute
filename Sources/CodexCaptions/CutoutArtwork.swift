@@ -5,6 +5,34 @@ import ImageIO
 /// appearance and pose intact. Shared images survive successful swaps by path;
 /// obsolete images are released instead of retaining every outfit ever seen.
 final class CutoutArtwork {
+    /// Counts real backing rows, once per image, including 8-bit masks.
+    /// Admission is transactional: old pixels stay alive until the swap commits.
+    private struct DecodedBudget {
+        let limit: Int
+        let previous: [CGImage]
+        var images: [ObjectIdentifier: CGImage] = [:]
+        var bytes = 0
+        var peakResidentBytes = 0
+        static func bytes(_ image: CGImage) -> Int { image.bytesPerRow * image.height }
+        mutating func admit(_ values: [CGImage]) throws {
+            for image in values where images[ObjectIdentifier(image)] == nil {
+                let size = Self.bytes(image)
+                try checkAdditional(size)
+                images[ObjectIdentifier(image)] = image; bytes += size
+            }
+            var resident = images
+            for image in previous { resident[ObjectIdentifier(image)] = image }
+            peakResidentBytes = max(peakResidentBytes,resident.values.reduce(0) { $0+Self.bytes($1) })
+        }
+        func checkAdditional(_ size: Int) throws {
+            guard size >= 0, size <= limit-bytes else {
+                throw CutoutError.invalid("Decoded cutout cache exceeds its \(limit)-byte budget")
+            }
+        }
+        mutating func release(_ image:CGImage) {
+            if images.removeValue(forKey:ObjectIdentifier(image)) != nil {bytes-=Self.bytes(image)}
+        }
+    }
     struct Part {
         let slot: Int
         let bone: Int
@@ -29,7 +57,6 @@ final class CutoutArtwork {
         let masks: [CGImage]
         let blinkCount: Int
         let mouthCount: Int
-        var bytes: Int { forms.reduce(0) { $0+$1.width*$1.height*5 } }
     }
     struct EyeAperture {
         let key: String
@@ -37,7 +64,6 @@ final class CutoutArtwork {
         let bone: Int
         let rect: CGRect
         let masks: [CGImage]
-        var bytes:Int {masks.reduce(0){$0+$1.width*$1.height}}
     }
     struct ClothTriangle {
         let a:CGPoint, b:CGPoint, c:CGPoint
@@ -51,7 +77,17 @@ final class CutoutArtwork {
         let rect:CGRect
         let outside:CGPath
         let vertices:[CGPoint]
-        var bytes:Int {forms.reduce(0){$0+$1.width*$1.height*4}}
+    }
+    struct HairPatch {
+        let definition: CutoutRig.HairDeformation
+        let driver: Int
+        let root: Double
+        let tip: Double
+        let levels: [Double]
+        func offset(at y:Double,amount:Double)->Double {
+            let w=min(1,max(0,(root-y)/(root-tip)))
+            return min(1,max(-1,amount))*definition.maxOffset*w*w*(3-2*w)
+        }
     }
     let rig: CutoutRig
     let player: CutoutPlayer
@@ -63,20 +99,29 @@ final class CutoutArtwork {
     private(set) var decodedImages = 0
     private(set) var resourceReads = 0
     private(set) var decodedBytes = 0
+    private(set) var peakResidentDecodedBytes = 0
+    private(set) var releasedDecodedBytes = 0
+    private(set) var cacheHits = 0
     private(set) var drawCount = 0
     private(set) var drawOperations = 0
     private var expressionImages: [String: [CGImage]] = [:]
+    private var expressionResources: [String: CGImage] = [:]
     private var mouthShapeImages: [String: [CGImage]] = [:]
     private var composites: [Composite] = []
     private var eyeApertures: [Int:EyeAperture] = [:]
     private var clothPatches:[Int:ClothPatch] = [:]
+    private(set) var hairPatches:[Int:HairPatch] = [:]
     private(set) var clothPatchImagesBuilt = 0
     private(set) var eyeMaskImagesBuilt = 0
     private(set) var compositeBuilds = 0
     private(set) var compositeBuildsByID: [String:Int] = [:]
-    private var expressionBytes: Int {
-        (Array(expressionImages.values) + Array(mouthShapeImages.values)).flatMap { $0 }
-            .reduce(0) { $0+$1.width*$1.height*4 }
+    private var retainedImages: [CGImage] {
+        var result = Array(images.values)
+        result.append(contentsOf:expressionResources.values)
+        for composite in composites { result.append(contentsOf:composite.forms); result.append(contentsOf:composite.masks) }
+        for eye in eyeApertures.values { result.append(contentsOf:eye.masks) }
+        for cloth in clothPatches.values { result.append(contentsOf:cloth.forms) }
+        return result
     }
 
     init(rig: CutoutRig, resource: @escaping (String) -> URL?) throws {
@@ -86,10 +131,12 @@ final class CutoutArtwork {
         let motions = try JSONDecoder().decode(CutoutMotionLibrary.self, from: Data(contentsOf: url))
         player = try CutoutPlayer(rig: rig, motions: motions)
         // Finite local expression atlas; cache only tiny patches, never bodies.
+        var budget = DecodedBudget(limit:min(rig.cacheByteLimit,8*1024*1024),previous:[])
         for (slot, files) in rig.expressions ?? [:] {
             for file in files {
-                let image=try decode(file)
-                guard expressionBytes+image.width*image.height*4<=8*1024*1024 else {throw CutoutError.invalid("Expression atlas exceeds 8 MiB")}
+                let image: CGImage
+                if let hit = expressionResources[file] { image = hit; cacheHits += 1 }
+                else { image = try decode(file,budget:&budget); expressionResources[file] = image }
                 expressionImages[slot,default:[]].append(image)
             }
         }
@@ -97,10 +144,9 @@ final class CutoutArtwork {
         for shape in rig.mouthShapes ?? [] {
             for file in shape.forms {
                 let image: CGImage
-                if file == rig.expressions?["mouth"]?.first, let neutralMouth { image = neutralMouth }
-                else { image = try decode(file) }
-                guard let neutralMouth, image.width == neutralMouth.width, image.height == neutralMouth.height,
-                      expressionBytes+image.width*image.height*4 <= 8*1024*1024 else {
+                if let hit = expressionResources[file] { image = hit; cacheHits += 1 }
+                else { image = try decode(file,budget:&budget); expressionResources[file] = image }
+                guard let neutralMouth, image.width == neutralMouth.width, image.height == neutralMouth.height else {
                     throw CutoutError.invalid("Mouth shape must match its registered local patch and 8 MiB budget")
                 }
                 mouthShapeImages[shape.id, default: []].append(image)
@@ -118,20 +164,25 @@ final class CutoutArtwork {
         }
     }
 
-    private func decode(_ file: String) throws -> CGImage {
+    private func decode(_ file: String, budget: inout DecodedBudget) throws -> CGImage {
         guard let url = resource(file), let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
               let width = props[kCGImagePropertyPixelWidth] as? Int,
               let height = props[kCGImagePropertyPixelHeight] as? Int,
-              width > 0, height > 0, width <= 2048, height <= 2048, width*height <= 2_000_000,
-              let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
+              width > 0, height > 0, width <= 2048, height <= 2048, width*height <= 2_000_000 else {
             throw CutoutError.invalid("Missing, corrupt or oversized component: \(file)")
+        }
+        try budget.checkAdditional(width*height*4)
+        guard let image = CGImageSourceCreateImageAtIndex(source, 0, [kCGImageSourceShouldCacheImmediately: true] as CFDictionary) else {
+            throw CutoutError.invalid("Cannot decode component: \(file)")
         }
         resourceReads += 1; decodedImages += 1
         // ImageIO's immediate-cache hint still leaves a compressed provider in
         // AppKit display lists. Own the finite RGBA buffer so native compositing
         // cannot re-enter the PNG decoder on each frame.
-        return try CutoutPixels(image).image(appKitFormat: true)
+        let owned = try CutoutPixels(image).image(appKitFormat: true)
+        try budget.admit([owned])
+        return owned
     }
 
     func select(_ changes: [String: String]) throws {
@@ -146,14 +197,22 @@ final class CutoutArtwork {
         let attachments = variants.flatMap(\.attachments)
         let slotIndices = Dictionary(uniqueKeysWithValues: rig.slots.enumerated().map { ($0.element.id, $0.offset) })
         var cache: [String: CGImage] = [:], prepared: [Part] = []
-        var bytes = 0
+        var budget = DecodedBudget(limit:rig.cacheByteLimit,previous:retainedImages)
+        defer { peakResidentDecodedBytes = max(peakResidentDecodedBytes,budget.peakResidentBytes) }
+        try budget.admit(Array(expressionResources.values))
         for a in attachments {
             let index = slotIndices[a.slot]!, slot = rig.slots[index]
             let image: CGImage
-            if let hit = cache[a.file] ?? images[a.file] { image = hit }
-            else { image = try decode(a.file) }
-            if cache[a.file] == nil { bytes += image.width*image.height*4; cache[a.file] = image }
-            guard bytes <= 24*1024*1024 else { throw CutoutError.invalid("Selected skin exceeds the 24 MiB decoded budget") }
+            let key=a.file+(a.maskOut.map {"#mask=\($0)"} ?? "")
+            if let hit = cache[key] ?? (a.maskOut == nil ? expressionResources[a.file]:nil) ?? images[key] {image=hit;cacheHits+=1}
+            else {
+                let source=try decode(a.file,budget:&budget)
+                if let polygon=a.maskOut {
+                    image=try masked(source,attachment:a,polygon:polygon,budget:&budget)
+                    budget.release(source)
+                } else {image=source}
+            }
+            try budget.admit([image]); cache[key] = image
             let bone = player.indices[slot.bone]!, pivot = player.bindWorld[bone], r = a.rect
             var orientation=CGAffineTransform.identity
             if let angle=a.rotation, let p=a.pivot {
@@ -163,16 +222,18 @@ final class CutoutArtwork {
             prepared.append(Part(slot: index, bone: bone, image: image,
                 rect: CGRect(x: r[0]-pivot.x, y: r[1]-pivot.y, width: r[2], height: r[3]),orientation:orientation))
         }
+        let slotOrders=variants.first(where:{$0.category == "clothes"})?.slotOrders ?? [:]
         prepared.sort {
             let a = rig.slots[$0.slot], b = rig.slots[$1.slot]
-            return a.order == b.order ? $0.slot < $1.slot : a.order < b.order
+            let x=slotOrders[a.id] ?? a.order,y=slotOrders[b.id] ?? b.order
+            return x == y ? $0.slot < $1.slot : x < y
         }
         var preparedUnderlaps = [Underlap]()
         for patch in variants.flatMap({ $0.underlaps ?? [] }) {
             let image: CGImage
-            if let cached = cache[patch.file] ?? images[patch.file] { image = cached } else { image = try decode(patch.file) }
-            if cache[patch.file] == nil { cache[patch.file] = image;bytes += image.width*image.height*4 }
-            guard bytes+expressionBytes <= 24*1024*1024 else { throw CutoutError.invalid("Selected skin exceeds decoded budget") }
+            if let cached = cache[patch.file] ?? expressionResources[patch.file] ?? images[patch.file] { image = cached; cacheHits += 1 }
+            else { image = try decode(patch.file,budget:&budget) }
+            try budget.admit([image]); cache[patch.file] = image
             let bone = player.indices[patch.bone]!, pivot = player.bindWorld[bone], r = patch.rect
             preparedUnderlaps.append(.init(bone:bone,triggers:patch.triggers.map { player.indices[$0]! },image:image,
                 rect:CGRect(x:r[0]-pivot.x,y:r[1]-pivot.y,width:r[2],height:r[3])))
@@ -181,12 +242,11 @@ final class CutoutArtwork {
         for group in rig.composites ?? [] {
             let members = prepared.filter { group.slots.contains(rig.slots[$0.slot].id) }
             guard !members.isEmpty else { continue }
-            let key = group.id+":sourceOver=\(group.sourceOver == true):"+attachments.filter { group.slots.contains($0.slot) }.map { "\($0.slot):\($0.file):\($0.rect)" }.sorted().joined(separator:"|")
+            let key = group.id+":sourceOver=\(group.sourceOver == true):"+attachments.filter { group.slots.contains($0.slot) }.map { "\($0.slot):\($0.file):\($0.rect):\($0.maskOut ?? [])" }.sorted().joined(separator:"|")
             let composite:Composite
             if let hit = composites.first(where: { $0.key == key }) { composite = hit }
-            else { composite = try makeComposite(id:group.id,key:key,bone:player.indices[group.bone]!,members:members,sourceOver:group.sourceOver == true) }
-            bytes += composite.bytes
-            guard bytes+expressionBytes <= 24*1024*1024 else { throw CutoutError.invalid("Local atlas exceeds the selected decoded budget") }
+            else { composite = try makeComposite(id:group.id,key:key,bone:player.indices[group.bone]!,members:members,sourceOver:group.sourceOver == true,budget:&budget) }
+            try budget.admit(composite.forms + composite.masks)
             preparedComposites.append(composite)
         }
         var preparedEyes=[Int:EyeAperture]()
@@ -199,33 +259,66 @@ final class CutoutArtwork {
             if let hit=eyeApertures[irisIndex],hit.key==key {aperture=hit}
             else {
                 let forms=expressionImages[eye.white] ?? [white.image]
-                let masks=forms.enumerated().map { index,image in
-                    Self.eyeMask(image,closing:eye.closing,amount:Double(index)/Double(max(1,forms.count-1)))
+                let masks = try forms.enumerated().map { index,image in
+                    try budget.checkAdditional(image.width*image.height)
+                    let mask = Self.eyeMask(image,closing:eye.closing,amount:Double(index)/Double(max(1,forms.count-1)))
+                    try budget.admit([mask]); return mask
                 }
                 eyeMaskImagesBuilt += masks.count
                 aperture=EyeAperture(key:key,iris:irisIndex,bone:white.bone,rect:white.rect,masks:masks)
             }
-            bytes += aperture.bytes;preparedEyes[irisIndex]=aperture
+            try budget.admit(aperture.masks); preparedEyes[irisIndex]=aperture
         }
         var preparedCloth=[Int:ClothPatch]()
-        for definition in rig.clothDeformations ?? [] {
+        let clothDefinitions=variants.first(where:{$0.category == "clothes"})?.clothDeformations ?? rig.clothDeformations ?? []
+        for definition in clothDefinitions {
             let slot=slotIndices[definition.slot]!
             guard let part=prepared.first(where:{$0.slot==slot}),let attachment=attachments.first(where:{$0.slot==definition.slot}) else {continue}
             let key="\(attachment.file)|\(part.rect)"
             let patch:ClothPatch
-            if let cached=clothPatches[slot],cached.key==key {patch=cached}
-            else {patch=try makeClothPatch(definition,part:part,key:key)}
-            bytes+=patch.bytes;preparedCloth[slot]=patch
+            if let cached=clothPatches[slot],cached.key==key && cached.definition==definition {patch=cached}
+            else {patch=try makeClothPatch(definition,part:part,key:key,budget:&budget)}
+            try budget.admit(patch.forms); preparedCloth[slot]=patch
         }
-        guard bytes+expressionBytes<=24*1024*1024 else {throw CutoutError.invalid("Selected face/skin exceeds decoded budget")}
+        var preparedHair=[Int:HairPatch]()
+        for definition in rig.hairDeformations ?? [] {
+            let slot=slotIndices[definition.slot]!
+            guard let part=prepared.first(where:{$0.slot==slot}) else {continue}
+            let pivot=player.bindWorld[part.bone].y
+            let root=definition.rootY-pivot,tip=definition.tipY-pivot
+            var levels:[Double]=(0...definition.rows).map {Double(part.rect.minY)+Double(part.rect.height)*Double($0)/Double(definition.rows)}
+            levels.append(contentsOf:[root,tip].filter { $0>part.rect.minY && $0<part.rect.maxY })
+            preparedHair[slot]=HairPatch(definition:definition,driver:player.indices[definition.driver]!,
+                root:root,tip:tip,levels:Array(Set(levels)).sorted())
+        }
+        let old = Dictionary(retainedImages.map { (ObjectIdentifier($0),$0) },uniquingKeysWith:{ a,_ in a })
+        releasedDecodedBytes += old.filter { budget.images[$0.key] == nil }.values.reduce(0) { $0+DecodedBudget.bytes($1) }
         // Atomic commit after every file, slot and bounded local atlas is prepared.
         images = cache; parts = prepared; underlaps = preparedUnderlaps; selection = next
         composites = preparedComposites;eyeApertures=preparedEyes
         clothPatches=preparedCloth
-        decodedBytes = bytes + expressionBytes
+        hairPatches=preparedHair
+        decodedBytes = budget.bytes
     }
 
-    private func makeClothPatch(_ definition:CutoutRig.ClothDeformation,part:Part,key:String)throws->ClothPatch {
+    private func masked(_ image:CGImage,attachment:CutoutRig.Attachment,polygon:[[Double]],budget:inout DecodedBudget)throws->CGImage {
+        try budget.checkAdditional(image.width*image.height*4)
+        guard let context=CGContext(data:nil,width:image.width,height:image.height,bitsPerComponent:8,bytesPerRow:image.width*4,
+            space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue) else {
+            throw CutoutError.invalid("Cannot prepare excluded hair region")
+        }
+        context.draw(image,in:CGRect(x:0,y:0,width:image.width,height:image.height))
+        let r=attachment.rect
+        context.scaleBy(x:Double(image.width)/r[2],y:Double(image.height)/r[3]);context.translateBy(x:-r[0],y:-r[1])
+        context.setBlendMode(.clear);context.setShouldAntialias(false)
+        context.move(to:CGPoint(x:polygon[0][0],y:polygon[0][1]))
+        for p in polygon.dropFirst() {context.addLine(to:CGPoint(x:p[0],y:p[1]))}
+        context.closePath();context.fillPath()
+        guard let output=context.makeImage() else {throw CutoutError.invalid("Cannot finish excluded hair region")}
+        try budget.admit([output]);return output
+    }
+
+    private func makeClothPatch(_ definition:CutoutRig.ClothDeformation,part:Part,key:String,budget:inout DecodedBudget)throws->ClothPatch {
         let r=definition.region
         let rect=CGRect(x:r[0],y:r[1],width:r[2],height:r[3]).integral
         guard rect.intersects(part.rect), part.image.width==Int(part.rect.width),part.image.height==Int(part.rect.height) else {
@@ -242,6 +335,7 @@ final class CutoutArtwork {
             triangles.append(ClothTriangle(a:a,b:b,c:c));triangles.append(ClothTriangle(a:a,b:c,c:d))
         }
         let steps=14,count=steps*2+1,width=Int(rect.width),height=Int(rect.height)
+        try budget.checkAdditional(width*height*4*count)
         guard width*height*4*count<=4*1024*1024,
               let source=CGContext(data:nil,width:part.image.width,height:part.image.height,bitsPerComponent:8,bytesPerRow:part.image.width*4,
                 space:CGColorSpace(name:CGColorSpace.sRGB)!,bitmapInfo:CGImageAlphaInfo.premultipliedLast.rawValue) else {
@@ -292,7 +386,7 @@ final class CutoutArtwork {
                 }}
             }
             guard let image=context.makeImage() else {throw CutoutError.invalid("Cannot finish cloth form")}
-            forms.append(image)
+            try budget.admit([image]); forms.append(image)
         }
         clothPatchImagesBuilt+=forms.count
         return ClothPatch(key:key,definition:definition,driver:player.indices[definition.driver]!,forms:forms,angleSteps:steps,rect:rect,outside:outside,vertices:vertices)
@@ -321,7 +415,34 @@ final class CutoutArtwork {
         return 2
     }
 
-    private func makeComposite(id:String,key:String,bone:Int,members:[Part],sourceOver:Bool) throws -> Composite {
+    /// Piecewise affine strips share identical boundary vertices. No new bitmap
+    /// is decoded/generated; deformation is confined to the selected hair image.
+    private func drawHair(_ part:Part,_ patch:HairPatch,in context:CGContext)->Int {
+        let amount=player.local[patch.driver].x
+        guard abs(amount)>1e-9 else {context.draw(part.image,in:part.rect);return 1}
+        // Isolate the hair before replacing overlap pixels. Copying into the
+        // parent would erase the face/background; source-over overlap would
+        // darken semitransparent edges. Shared-edge clips can leave GPU seams.
+        context.beginTransparencyLayer(in:part.rect.insetBy(dx:patch.definition.maxOffset+2,dy:2),auxiliaryInfo:nil)
+        context.setBlendMode(.copy)
+        let transform=context.ctm
+        let deviceScale=max(0.01,hypot(transform.c,transform.d))
+        let overlap=2/deviceScale
+        for row in 0..<(patch.levels.count-1) {
+            let y0=patch.levels[row],y1=patch.levels[row+1]
+            let x0=patch.offset(at:y0,amount:amount),x1=patch.offset(at:y1,amount:amount)
+            let shear=(x1-x0)/(y1-y0)
+            context.saveGState();context.setShouldAntialias(false)
+            context.concatenate(CGAffineTransform(a:1,b:0,c:shear,d:1,tx:x0-shear*y0,ty:0))
+            context.clip(to:CGRect(x:part.rect.minX,y:y0-overlap,width:part.rect.width,height:y1-y0+2*overlap))
+            context.draw(part.image,in:part.rect);context.restoreGState()
+        }
+        context.setBlendMode(.normal)
+        context.endTransparencyLayer()
+        return patch.levels.count-1
+    }
+
+    private func makeComposite(id:String,key:String,bone:Int,members:[Part],sourceOver:Bool,budget:inout DecodedBudget) throws -> Composite {
         let pivot = player.bindWorld[bone]
         let sourceRects = members.map { p in p.rect.offsetBy(dx:player.bindWorld[p.bone].x-pivot.x,dy:player.bindWorld[p.bone].y-pivot.y) }
         let rect = sourceRects.reduce(CGRect.null) { $0.union($1) }.integral
@@ -331,6 +452,7 @@ final class CutoutArtwork {
         guard width>0,height>0,width<=1024,height<=1024,count<=16,width*height*4*count<=8*1024*1024 else {
             throw CutoutError.invalid("Local composite exceeds its 8 MiB budget")
         }
+        try budget.checkAdditional(width*height*5*count)
         var forms=[CGImage]()
         let images = members.map { expressionImages[rig.slots[$0.slot].id] ?? [$0.image] }
         let masks = images.map { $0.map(Self.coverageMask) }
@@ -350,11 +472,15 @@ final class CutoutArtwork {
                 context.draw(atlas[choice],in:sourceRects[i]);context.restoreGState()
             }
             guard let image=context.makeImage() else { throw CutoutError.invalid("Cannot finish local composite") }
-            forms.append(image)
+            try budget.admit([image]); forms.append(image)
         } }
         compositeBuilds += 1
         compositeBuildsByID[id,default:0] += 1
-        return Composite(key:key,bone:bone,sourceOver:sourceOver,members:members.map(\.slot),memberBones:members.map(\.bone),rect:rect,forms:forms,masks:forms.map(Self.coverageMask),blinkCount:blinkCount,mouthCount:mouthCount)
+        let coverage = try forms.map { image -> CGImage in
+            try budget.checkAdditional(image.width*image.height)
+            let mask = Self.coverageMask(image); try budget.admit([mask]); return mask
+        }
+        return Composite(key:key,bone:bone,sourceOver:sourceOver,members:members.map(\.slot),memberBones:members.map(\.bone),rect:rect,forms:forms,masks:coverage,blinkCount:blinkCount,mouthCount:mouthCount)
     }
 
     private static func coverageMask(_ image:CGImage)->CGImage {
@@ -389,7 +515,18 @@ final class CutoutArtwork {
         let display = CGAffineTransform(a:sign,b:0,c:0,d:amount,
             tx:anchor.x-rig.anchor[0]*sign,ty:anchor.y-rig.anchor[1]*amount)
         var bounds = CGRect.null
-        for part in parts { bounds = bounds.union(part.rect.applying(part.orientation.concatenating(player.world[part.bone]).concatenating(display))) }
+        for part in parts {
+            let transform=part.orientation.concatenating(player.world[part.bone]).concatenating(display)
+            if let patch=hairPatches[part.slot] {
+                for y in patch.levels {
+                    let offset=patch.offset(at:y,amount:player.local[patch.driver].x)
+                    for x in [part.rect.minX,part.rect.maxX] {
+                        let p=CGPoint(x:x+offset,y:y).applying(transform)
+                        bounds=bounds.union(CGRect(x:p.x,y:p.y,width:0.01,height:0.01))
+                    }
+                }
+            } else {bounds=bounds.union(part.rect.applying(transform))}
+        }
         for patch in underlaps { bounds = bounds.union(patch.rect.applying(player.world[patch.bone].concatenating(display))) }
         for patch in clothPatches.values {
             let angle=min(patch.definition.angleLimit,max(-patch.definition.angleLimit,player.local[patch.driver].rotation))
@@ -410,6 +547,13 @@ final class CutoutArtwork {
         return bounds.isNull ? .zero : bounds.insetBy(dx:-3,dy:-3).integral
     }
 
+    /// Stable registration used by overlays, redraws and exported motion frames.
+    func motionBounds(anchor:CGPoint,scale:Double = 1,mirrored:Bool = false) -> CGRect {
+        let amount = rig.pointsPerPixel*scale, sign = mirrored ? -amount : amount
+        return rig.sharedMotionBounds.applying(CGAffineTransform(a:sign,b:0,c:0,d:amount,
+            tx:anchor.x-rig.anchor[0]*sign,ty:anchor.y-rig.anchor[1]*amount))
+    }
+
     func draw(in context: CGContext, anchor: CGPoint, scale: Double = 1,
               mirrored: Bool = false, blink: Double = 0, mouth: Double = 0, mouthShape: String? = nil,
               skeleton: Bool = false) {
@@ -419,6 +563,7 @@ final class CutoutArtwork {
         context.translateBy(x: anchor.x, y: anchor.y)
         context.scaleBy(x: mirrored ? -amount : amount, y: amount)
         context.translateBy(x: -rig.anchor[0], y: -rig.anchor[1])
+        if rig.motionBounds != nil { context.clip(to:rig.sharedMotionBounds) }
         // Linear texture sampling preserves pixel-art edges at the app's small
         // display size without the high-order resampling cost per component.
         context.interpolationQuality = .medium
@@ -445,6 +590,8 @@ final class CutoutArtwork {
             if let group = composites.first(where: { candidate in
                 candidate.members.first == part.slot && candidate.memberBones.allSatisfy {
                     samePlane(plane($0),plane(candidate.bone))
+                } && candidate.members.allSatisfy { slot in
+                    hairPatches[slot].map { abs(player.local[$0.driver].x)<=1e-9 } ?? true
                 }
             }) {
                 func form(_ value:Double,_ count:Int)->Int {
@@ -489,7 +636,9 @@ final class CutoutArtwork {
                 let choice = min(forms.count-1,max(0,Int((normalized*Double(forms.count-1)).rounded())))
                 image = forms[choice]
             }
-            if let patch=clothPatches[part.slot] {
+            if let patch=hairPatches[part.slot] {
+                individual+=drawHair(part,patch,in:context)-1
+            } else if let patch=clothPatches[part.slot] {
                 individual+=drawCloth(part,patch,in:context)-1
             } else {context.draw(image, in: part.rect)}
             context.restoreGState()

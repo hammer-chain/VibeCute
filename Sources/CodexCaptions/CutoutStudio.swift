@@ -36,7 +36,8 @@ final class CutoutStudioState: ObservableObject {
         self.candidatePath = candidatePath
         hasBlink=(artwork.rig.expressions ?? [:]).contains{$0.key != "mouth" && $0.value.count>1}
         hasMouth=(artwork.rig.expressions?["mouth"]?.count ?? 0)>1
-        action = artwork.player.clips.first(where:{$0.definition.id == "thinking"})?.definition.id
+        action = artwork.player.clips.first(where:{$0.definition.id == "thinking-classic"})?.definition.id
+            ?? artwork.player.clips.first(where:{$0.definition.id == "thinking"})?.definition.id
             ?? artwork.player.clips.first(where:{$0.definition.id == "idle"})?.definition.id
             ?? artwork.player.clips.first(where:{$0.definition.id == "head-sway"})?.definition.id
             ?? artwork.player.clips[0].definition.id
@@ -46,7 +47,11 @@ final class CutoutStudioState: ObservableObject {
         artwork.player.play(action, at: 0, transition: 0)
     }
     var clock: Double { playing ? ProcessInfo.processInfo.systemUptime-clockOrigin : stoppedAt }
-    var duration: Double { artwork.player.clips.first { $0.definition.id == action }!.definition.duration }
+    var duration: Double { artwork.player.clips[artwork.player.clipIndex].duration }
+    func synchronizeAction() {
+        let active = artwork.player.clips[artwork.player.clipIndex].definition.id
+        if action != active { action = active; position = 0 }
+    }
     func faceInputs(at time:Double)->(blink:Double,mouth:Double,gaze:CGPoint,shape:String?) {
         let b=eyeMode == "auto" ? artwork.player.automaticBlink(at:time,fallback:CutoutArtwork.blink(at:time)):min(1,max(0,blink))
         let m=(mouthMode == "talk" || mouthMode == "cycle") ? CutoutArtwork.talkingPreview(at:time):(mouthMode == "manual" ? min(1,max(0,mouth)):0)
@@ -66,11 +71,11 @@ final class CutoutStudioState: ObservableObject {
     }
 
     func setAction(_ value: String) {
-        guard artwork.player.clips.contains(where:{$0.definition.id == value}) else {
+        guard let clip=artwork.player.clips.first(where:{$0.definition.id == value}) else {
             error = "当前角色没有这个动作："+value;return
         }
         let time=clock,face=faceInputs(at:time)
-        _ = artwork.player.play(value, at: time,blink:face.blink)
+        _ = artwork.player.play(value, at: time,transition:clip.definition.interpolation == .step ? 0 : 0.25,blink:face.blink)
         action = value; position = 0
     }
     func setPlaying(_ value: Bool) {
@@ -78,6 +83,8 @@ final class CutoutStudioState: ObservableObject {
         if value { clockOrigin = ProcessInfo.processInfo.systemUptime-stoppedAt }
         else {
             stoppedAt = clock
+            artwork.player.sample(at:stoppedAt)
+            action = artwork.player.clips[artwork.player.clipIndex].definition.id
             let elapsed=max(0,stoppedAt-artwork.player.startedAt)
             position=artwork.player.clips[artwork.player.clipIndex].definition.loop
                 ? elapsed.truncatingRemainder(dividingBy:duration)/duration : min(1,elapsed/duration)
@@ -155,11 +162,20 @@ final class CutoutCanvasView: NSView {
                 let time = state.clock,before = ProcessInfo.processInfo.systemUptime
                 let face=state.faceInputs(at:time)
                 state.artwork.player.sample(at:time,gaze:face.gaze)
+                state.synchronizeAction()
                 self.sampleSeconds += ProcessInfo.processInfo.systemUptime-before
                 self.pendingTime = time
-                let current = state.artwork.displayBounds(anchor:CGPoint(x:self.bounds.midX,y:24),scale:state.scale,
-                    mirrored:state.mirrored,skeleton:state.skeleton)
+                let current = state.artwork.motionBounds(anchor:CGPoint(x:self.bounds.midX,y:24),scale:state.scale,
+                    mirrored:state.mirrored).union(state.skeleton
+                        ? state.artwork.displayBounds(anchor:CGPoint(x:self.bounds.midX,y:24),scale:state.scale,mirrored:state.mirrored,skeleton:true) : .null)
                 self.setNeedsDisplay(current.union(self.lastPaint))
+                let clip=state.artwork.player.clips[state.artwork.player.clipIndex]
+                if clip.definition.interpolation == .step {
+                    // Match the app preview: reuse this clock and also wake at
+                    // held-pose boundaries instead of rounding to a 30 Hz tick.
+                    let remaining=clip.remainingFrameTime(at:time-state.artwork.player.startedAt)-(state.clock-time)
+                    self.timer?.fireDate=Date(timeIntervalSinceNow:max(0.0001,min(1/30,remaining)))
+                }
             }
         }
         value.tolerance = 0.002
@@ -311,6 +327,12 @@ final class CutoutStudioController: NSObject, NSWindowDelegate {
                 candidatePath=url.path
             } else { artwork=try CutoutArtwork.bundled() }
             let state = CutoutStudioState(artwork:artwork,candidatePath:candidatePath)
+            for (flag,category) in [("--cutout-clothes","clothes"),("--cutout-headwear","headwear")] {
+                if let index=CommandLine.arguments.firstIndex(of:flag),CommandLine.arguments.indices.contains(index+1) {
+                    state.select(category,CommandLine.arguments[index+1])
+                    if let error=state.error {throw CutoutError.invalid(error)}
+                }
+            }
             let window = NSWindow(contentRect:NSRect(x:0,y:0,width:760,height:580),styleMask:[.titled,.closable,.miniaturizable,.resizable],backing:.buffered,defer:false)
             window.title = candidatePath == nil ? "VibeCute · Cutout 动作工作台" : "VibeCute · Cutout 原图候选（未验收）"; window.isReleasedWhenClosed = false; window.delegate = self
             window.contentViewController = NSHostingController(rootView:CutoutStudioView(state:state) { [weak self] view in self?.canvas = view })
@@ -337,6 +359,9 @@ final class CutoutStudioController: NSObject, NSWindowDelegate {
     /// Records process/window identity and real draw counters. It never changes
     /// daily settings or claims an offscreen bitmap is a screen capture.
     private func nativeSmoke(_ directory:URL) {
+        if CommandLine.arguments.contains("--cutout-playback-smoke") || CommandLine.arguments.contains("--cutout-wardrobe-smoke") {
+            playbackSmoke(directory); return
+        }
         try? FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
         // This opt-in fixture must remain visible while measuring playback.
         // Other ordinary windows can cover a newly launched same-bundle instance.
@@ -575,6 +600,66 @@ final class CutoutStudioController: NSObject, NSWindowDelegate {
                 self.state?.mouthMode="cycle";self.state?.mouthShape="default";self.state?.setScale(1)
                 self.state?.setPlaying(true);self.canvas?.update()
             }
+        }
+    }
+
+    /// Isolated real-window acceptance for the configurable playback contract.
+    private func playbackSmoke(_ directory:URL) {
+        try? FileManager.default.createDirectory(at:directory,withIntermediateDirectories:true)
+        window?.level = .floating; window?.orderFrontRegardless()
+        var rows = [[String:Any]]()
+        func record(_ label:String,_ phasePreserved:Bool?=nil) {
+            guard let state=self.state,let canvas=self.canvas,let window=self.window else {return}
+            let art=state.artwork,player=art.player
+            var usage=rusage();getrusage(RUSAGE_SELF,&usage)
+            let cpu=Double(usage.ru_utime.tv_sec+usage.ru_stime.tv_sec)+Double(usage.ru_utime.tv_usec+usage.ru_stime.tv_usec)/1_000_000
+            let bounds=art.motionBounds(anchor:CGPoint(x:canvas.bounds.midX,y:24),scale:state.scale)
+            var row:[String:Any] = ["label":label,"clock":state.clock,"pid":ProcessInfo.processInfo.processIdentifier,
+                "bundle":Bundle.main.bundleURL.path,"visible":window.isVisible,"unoccluded":window.occlusionState.contains(.visible),
+                "activeClip":player.clips[player.clipIndex].definition.id,"clipStartedAt":player.startedAt,
+                "duration":player.clips[player.clipIndex].duration,"timerActive":canvas.timerActive,"ticks":canvas.ticks,"draws":canvas.redraws,
+                "resourceReads":art.resourceReads,"decodedImages":art.decodedImages,"decodedBytes":art.decodedBytes,
+                "decodedByteLimit":art.rig.cacheByteLimit,"peakResidentDecodedBytes":art.peakResidentDecodedBytes,"releasedDecodedBytes":art.releasedDecodedBytes,
+                "cpuSeconds":cpu,"drawSeconds":canvas.drawSeconds,"hair":art.selection["hair"] ?? "",
+                "clothes":art.selection["clothes"] ?? "","headwear":art.selection["headwear"] ?? "",
+                "crop":[bounds.minX,bounds.minY,bounds.width,bounds.height],"withinCanvas":canvas.bounds.contains(bounds),"error":state.error ?? ""]
+            if let phasePreserved {row["swapPhasePreserved"]=phasePreserved}
+            rows.append(row)
+            if let data=try? JSONSerialization.data(withJSONObject:rows,options:[.prettyPrinted,.sortedKeys]) {
+                try? data.write(to:directory.appendingPathComponent("observations.json"),options:.atomic)
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline:.now()+0.25) {record("default-action")}
+        DispatchQueue.main.asyncAfter(deadline:.now()+0.5) {
+            self.state?.setAction("tail-wag-once"); self.canvas?.update(); record("start")
+        }
+        DispatchQueue.main.asyncAfter(deadline:.now()+1.5) {record("one-shot")}
+        DispatchQueue.main.asyncAfter(deadline:.now()+3) {
+            record("fallback"); self.state?.select("hair","hair-style-high-twin-no-side-locks")
+            self.state?.setAction("thinking-classic");self.canvas?.update()
+        }
+        DispatchQueue.main.asyncAfter(deadline:.now()+5) {record("hair-playing");self.state?.setPlaying(false);self.canvas?.update()}
+        DispatchQueue.main.asyncAfter(deadline:.now()+5.5) {record("paused-start")}
+        DispatchQueue.main.asyncAfter(deadline:.now()+7.5) {
+            record("paused-end");self.state?.select("hair","hair-original")
+            self.state?.setPlaying(true);self.canvas?.update()
+        }
+        DispatchQueue.main.asyncAfter(deadline:.now()+9) {record("resumed");self.window?.miniaturize(nil)}
+        DispatchQueue.main.asyncAfter(deadline:.now()+9.5) {record("hidden-start")}
+        DispatchQueue.main.asyncAfter(deadline:.now()+11.5) {
+            record("hidden-end"); self.window?.deminiaturize(nil);self.canvas?.update()
+        }
+        DispatchQueue.main.asyncAfter(deadline:.now()+13) {record("restored")}
+        if CommandLine.arguments.contains("--cutout-wardrobe-smoke") {
+            func change(_ category:String,_ value:String,_ label:String) {
+                guard let state=self.state else {return}
+                let player=state.artwork.player,pose=player.world,started=player.startedAt,clip=player.clipIndex
+                state.select(category,value);self.canvas?.update()
+                record(label,pose==player.world && started==player.startedAt && clip==player.clipIndex)
+            }
+            DispatchQueue.main.asyncAfter(deadline:.now()+3.5) {change("clothes","clothes-original","maid-swap")}
+            DispatchQueue.main.asyncAfter(deadline:.now()+4.2) {change("clothes","clothes-claude-code","workwear-swap")}
+            DispatchQueue.main.asyncAfter(deadline:.now()+7.8) {change("hair","hair-style-low-twin-tied-v6-no-side-locks","workwear-low-twin")}
         }
     }
 }

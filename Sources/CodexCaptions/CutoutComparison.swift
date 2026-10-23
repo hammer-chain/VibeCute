@@ -16,6 +16,9 @@ final class CutoutComparisonController: NSObject, NSWindowDelegate, ObservableOb
         MascotAnimation.cutoutCharacter.cutout!.variants.filter { $0.category == "hair" && $0.id != "hair-none" }
     }
     private(set) var smokeRows = [[String: Any]]()
+    private var rhythmTimer: Timer?
+    private var dragTimer: Timer?
+    private var replayGeneration=0
     var original: OverlayController? { overlays.character(for: .codex) }
     var cutout: OverlayController? { overlays.character(for: .deepseek) }
     private let bindings: [CaptionMascot: CharacterChoice] = [.codex: .deepseek, .deepseek: .deepseekCutout]
@@ -24,27 +27,60 @@ final class CutoutComparisonController: NSObject, NSWindowDelegate, ObservableOb
         if let window { window.makeKeyAndOrderFront(nil); refresh(); return }
         previousActivationPolicy = NSApp.activationPolicy()
         NSApp.setActivationPolicy(.regular)
-        let window = NSWindow(contentRect: NSRect(x: 0,y: 0,width: 440,height: 154),
+        let window = NSWindow(contentRect: NSRect(x: 0,y: 0,width: 440,height: 184),
             styleMask: [.titled,.closable,.miniaturizable],backing: .buffered,defer: false)
         window.title = "DeepSeek 两版对比"
         window.isReleasedWhenClosed = false; window.delegate = self
         window.contentView = NSHostingView(rootView: CutoutComparisonControls(controller: self))
         self.window = window
+        overlays.onCharacterDragStarted = { [weak self] _ in self?.startDragUpdates() }
         window.center(); window.makeKeyAndOrderFront(nil)
-        refresh(); NSApp.activate(ignoringOtherApps: true)
+        replay(); NSApp.activate(ignoringOtherApps: true)
         if let area = NSScreen.main?.visibleFrame {
             window.setFrameOrigin(NSPoint(x: area.midX-window.frame.width/2, y:area.minY+530))
         }
         runSmokeIfRequested()
         runHairstyleSmokeIfRequested()
+        runRhythmSmokeIfRequested()
+        runDragSmokeIfRequested()
     }
-    private func refresh(visible: Bool = true) {
+    /// This controller owns its overlays independently of AppModel's refresh.
+    /// Keep the interaction clock only until the drag and landing have finished.
+    private func startDragUpdates() {
+        guard dragTimer == nil else { return }
+        let timer=Timer(timeInterval:1/60,repeats:true) { [weak self] _ in
+            guard let self else { return }
+            self.overlays.finishReleasedCharacterDrags()
+            self.overlays.updateDragReactions(at:ProcessInfo.processInfo.systemUptime)
+            let interacting=[self.original,self.cutout].compactMap { $0 }.contains {
+                $0.panel.isManuallyDragging || $0.subtitle.dragReaction.active
+            }
+            if !interacting {
+                self.dragTimer?.invalidate();self.dragTimer=nil
+                // The normal pixel landing returns to frame zero. Restart the
+                // comparison together instead of leaving it out of phase.
+                self.replay()
+            }
+        }
+        dragTimer=timer;RunLoop.main.add(timer,forMode:.common)
+    }
+    func replay() {
+        // Prepare both renderers before either starts. Initial Cutout decoding
+        // must not consume the pixel preview's first 100 ms of playback.
+        refresh(active:false)
+        replayGeneration+=1;let generation=replayGeneration
+        DispatchQueue.main.asyncAfter(deadline:.now()+0.3) { [weak self] in
+            guard let self,self.replayGeneration==generation,self.window?.isVisible==true else {return}
+            self.refresh()
+        }
+    }
+    private func refresh(visible: Bool = true, active: Bool = true) {
         guard let window else { return }
         let visible = visible && window.isVisible && !window.isMiniaturized
         let items = visible ? [
-            OverlayItem(id:"cutout-comparison-original",text:"原逐帧版",header:"DeepSeek · 原逐帧",title:"原逐帧版",active:true,mascot:.codex),
+            OverlayItem(id:"cutout-comparison-original",text:"原逐帧版",header:"DeepSeek · 原逐帧",title:"原逐帧版",active:active,mascot:.codex),
             OverlayItem(id:"cutout-comparison-layered",text:motion == "thinking-classic" ? "Cutout · 原版节奏" : "Cutout · 发梢轻摆",
-                        header:"DeepSeek · Cutout",title:"Cutout 版",active:true,mascot:.deepseek)
+                        header:"DeepSeek · Cutout",title:"Cutout 版",active:active,mascot:.deepseek)
         ] : []
         overlays.update(items,font:16,opacity:0.72,bottom:80,screenIndex:0,movable:true,
             focusedID:"cutout-comparison-original",characterScale:scale,characterBindings:bindings,
@@ -52,12 +88,96 @@ final class CutoutComparisonController: NSObject, NSWindowDelegate, ObservableOb
         cutout?.subtitle.cutoutRenderer?.setThinkingClip(motion)
     }
     func windowWillClose(_ notification: Notification) {
+        rhythmTimer?.invalidate();rhythmTimer=nil
+        dragTimer?.invalidate();dragTimer=nil
+        replayGeneration+=1
         refresh(visible:false); window = nil
         if let previousActivationPolicy { NSApp.setActivationPolicy(previousActivationPolicy) }
         previousActivationPolicy = nil
     }
     func windowDidMiniaturize(_ notification: Notification) { refresh(visible:false) }
     func windowDidDeminiaturize(_ notification: Notification) { refresh() }
+
+    /// Exercise the actual panel callbacks and common-mode interaction timer.
+    /// No synthetic mouse events or replacement animation clock are used.
+    private func runDragSmokeIfRequested() {
+        let args=CommandLine.arguments
+        guard let i=args.firstIndex(of:"--cutout-drag-smoke-out"),i+1<args.count else {return}
+        let out=URL(fileURLWithPath:args[i+1])
+        try? FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+        var rows=[[String:Any]]()
+        func record(_ stage:String) {
+            guard let original=self.original,let renderer=self.cutout?.subtitle.cutoutRenderer else {return}
+            let row:[String:Any]=["stage":stage,"time":ProcessInfo.processInfo.systemUptime,
+                "manualDragging":original.panel.isManuallyDragging,
+                "dragActive":original.subtitle.dragReaction.active,
+                "dragFrame":original.subtitle.dragReaction.frameIndex ?? -1,
+                "interactionTimer":self.dragTimer != nil,"originalAnimating":original.subtitle.mascotAnimating,
+                "originalFrame":original.subtitle.mascotFrameIndex,
+                "cutoutFrame":renderer.sampledReferenceFrame ?? -1,"cutoutTicks":renderer.diagnostics["ticks"] ?? 0]
+            rows.append(row)
+            let report:[String:Any]=["pid":ProcessInfo.processInfo.processIdentifier,"bundle":Bundle.main.bundleURL.path,
+                "input":"panel begin/move/release callbacks","rows":rows]
+            if let data=try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]) {
+                try? data.write(to:out.appendingPathComponent("runtime.json"),options:.atomic)
+            }
+        }
+        func at(_ t:Double,_ action:@escaping()->Void) {DispatchQueue.main.asyncAfter(deadline:.now()+t,execute:action)}
+        at(1) {
+            record("before")
+            guard let panel=self.original?.panel else {return}
+            panel.beginManualDrag()
+            panel.setFrameOrigin(NSPoint(x:panel.frame.minX+40,y:panel.frame.minY+20))
+            record("began")
+        }
+        // Physical button state is up in this callback fixture. The interaction
+        // timer must discover that release itself, as after performDrag.
+        at(1.3) {record("released-and-landing")}
+        for index in 0..<12 {at(2.6+Double(index)*0.16) {record("resumed-\(index)")}}
+        at(4.6) {record("final")}
+    }
+
+    /// Read the two real renderers; no synthetic clock drives either side.
+    private func runRhythmSmokeIfRequested() {
+        let args=CommandLine.arguments
+        guard let i=args.firstIndex(of:"--cutout-rhythm-smoke-out"),i+1<args.count else {return}
+        let out=URL(fileURLWithPath:args[i+1])
+        try? FileManager.default.createDirectory(at:out,withIntermediateDirectories:true)
+        window?.level = .floating;window?.orderFrontRegardless()
+        let start=ProcessInfo.processInfo.systemUptime
+        var originalEvents=[[String:Any]](),cutoutEvents=[[String:Any]]()
+        var previousOriginal = -1,previousCutout = -1
+        var samples=0,mismatches=0
+        var maxUprightHeadError=0.0,hairMinimum=0.0,hairMaximum=0.0,hairRecoverySamples=0
+        let timer=Timer(timeInterval:1/120,repeats:true) { [weak self] timer in
+            guard let self,let original=self.original?.subtitle,let renderer=self.cutout?.subtitle.cutoutRenderer else {return}
+            let elapsed=ProcessInfo.processInfo.systemUptime-start
+            let frame=original.mascotFrameIndex,cutoutFrame=renderer.sampledReferenceFrame ?? -1
+            if cutoutFrame>=4,let h=renderer.artwork.player.indices["head"],let driver=renderer.artwork.player.indices["hair-return"] {
+                let player=renderer.artwork.player,head=player.world[h],bind=player.bindWorld[h]
+                maxUprightHeadError=max(maxUprightHeadError,abs(head.a-1),abs(head.b),abs(head.c),abs(head.d-1),abs(head.tx-bind.x),abs(head.ty-bind.y))
+                let amount=player.local[driver].x
+                hairMinimum=min(hairMinimum,amount);hairMaximum=max(hairMaximum,amount);hairRecoverySamples+=1
+            }
+            if frame != previousOriginal {originalEvents.append(["time":elapsed,"frame":frame]);previousOriginal=frame}
+            if cutoutFrame != previousCutout {cutoutEvents.append(["time":elapsed,"frame":cutoutFrame]);previousCutout=cutoutFrame}
+            samples+=1;if frame != cutoutFrame {mismatches+=1}
+            if elapsed>=18 {
+                timer.invalidate();self.rhythmTimer=nil
+                let report:[String:Any]=["pid":ProcessInfo.processInfo.processIdentifier,"bundle":Bundle.main.bundleURL.path,
+                    "originalEvents":originalEvents,"cutoutEvents":cutoutEvents,"samples":samples,"mismatchedSamples":mismatches,
+                    "diagnostics":renderer.diagnostics,"originalFrame":frame,
+                    "maxUprightHeadError":maxUprightHeadError,"hairMinimum":hairMinimum,"hairMaximum":hairMaximum,"hairRecoverySamples":hairRecoverySamples,
+                    "originalWindow":self.original?.panel.windowNumber ?? 0,"cutoutWindow":self.cutout?.panel.windowNumber ?? 0]
+                if let data=try? JSONSerialization.data(withJSONObject:report,options:[.prettyPrinted,.sortedKeys]) {
+                    try? data.write(to:out.appendingPathComponent("runtime.json"),options:.atomic)
+                }
+                try? self.original?.exportPreview(to:out.appendingPathComponent("original.png"))
+                try? self.cutout?.exportPreview(to:out.appendingPathComponent("cutout.png"))
+            }
+        }
+        rhythmTimer=timer;RunLoop.main.add(timer,forMode:.common)
+    }
 
     /// Opt-in native fixture: both actual app bindings, renderer diagnostics,
     /// scale changes, mouth input, minimize/resume and app hide/resume.
@@ -192,6 +312,7 @@ private struct CutoutComparisonControls: View {
             Picker("显示倍率",selection:$controller.scale) {
                 Text("50%").tag(0.5);Text("100%").tag(1.0);Text("200%").tag(2.0)
             }.pickerStyle(.segmented)
+            Button("重播") {controller.replay()}
         }.padding(16).frame(width:440)
     }
 }

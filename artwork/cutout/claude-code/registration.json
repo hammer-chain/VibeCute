@@ -1,0 +1,231 @@
+{
+  "attachments" : [
+    {
+      "file" : "outfits\/claude-code\/footwear.png",
+      "rect" : [
+        365,
+        32,
+        211,
+        80
+      ],
+      "slot" : "footwear",
+      "source" : "artwork\/cutout\/claude-code\/soft-socks-shoes-source.png",
+      "sourceBounds" : [
+        155,
+        1128,
+        713,
+        331
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/headwear.png",
+      "rect" : [
+        641,
+        738,
+        82,
+        94
+      ],
+      "slot" : "headwear",
+      "source" : "artwork\/cutout\/claude-code\/headwear-eight-spoke.png",
+      "sourceBounds" : [
+        200,
+        216,
+        852,
+        832
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/left-cuff.png",
+      "rect" : [
+        448,
+        287,
+        65,
+        71
+      ],
+      "slot" : "left-cuff",
+      "source" : "artwork\/cutout\/claude-code\/puffy-sleeves-source.png",
+      "sourceBounds" : [
+        1140,
+        768,
+        267,
+        165
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/left-fore.png",
+      "rect" : [
+        442,
+        262,
+        170,
+        163
+      ],
+      "slot" : "left-fore",
+      "source" : "artwork\/cutout\/claude-code\/puffy-sleeves-source.png",
+      "sourceBounds" : [
+        653,
+        550,
+        271,
+        432
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/left-hand.png",
+      "rect" : [
+        403,
+        271,
+        95,
+        89
+      ],
+      "slot" : "left-hand",
+      "source" : "artwork\/cutout\/claude-code\/source-sheet.png",
+      "sourceBounds" : [
+        376,
+        971,
+        209,
+        150
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/left-upper.png",
+      "rect" : [
+        524,
+        354,
+        102,
+        137
+      ],
+      "slot" : "left-upper",
+      "source" : "artwork\/cutout\/claude-code\/puffy-sleeves-source.png",
+      "sourceBounds" : [
+        205,
+        543,
+        266,
+        442
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/legwear.png",
+      "rect" : [
+        347,
+        60,
+        236,
+        270
+      ],
+      "slot" : "legwear",
+      "source" : "artwork\/cutout\/claude-code\/soft-socks-shoes-source.png",
+      "sourceBounds" : [
+        128,
+        118,
+        774,
+        885
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/right-cuff.png",
+      "rect" : [
+        414,
+        418,
+        72,
+        72
+      ],
+      "slot" : "right-cuff",
+      "source" : "artwork\/cutout\/claude-code\/puffy-sleeves-source.png",
+      "sourceBounds" : [
+        1141,
+        277,
+        266,
+        166
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/right-fore.png",
+      "rect" : [
+        322,
+        333,
+        171,
+        177
+      ],
+      "slot" : "right-fore",
+      "source" : "artwork\/cutout\/claude-code\/puffy-sleeves-source.png",
+      "sourceBounds" : [
+        656,
+        57,
+        263,
+        429
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/right-upper.png",
+      "rect" : [
+        324,
+        366,
+        104,
+        127
+      ],
+      "slot" : "right-upper",
+      "source" : "artwork\/cutout\/claude-code\/puffy-sleeves-source.png",
+      "sourceBounds" : [
+        188,
+        49,
+        257,
+        438
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/skirt-back.png",
+      "rect" : [
+        257,
+        210,
+        440,
+        65
+      ],
+      "slot" : "skirt-back",
+      "source" : "artwork\/cutout\/claude-code\/compact-outfit-source.png",
+      "sourceBounds" : [
+        95,
+        1221,
+        834,
+        166
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/skirt-front.png",
+      "rect" : [
+        242,
+        197,
+        470,
+        125
+      ],
+      "slot" : "skirt-front",
+      "source" : "artwork\/cutout\/claude-code\/compact-outfit-source.png",
+      "sourceBounds" : [
+        48,
+        809,
+        928,
+        297
+      ]
+    },
+    {
+      "file" : "outfits\/claude-code\/topwear.png",
+      "rect" : [
+        312,
+        300,
+        330,
+        265
+      ],
+      "slot" : "topwear",
+      "source" : "artwork\/cutout\/claude-code\/low-neckline-source.png",
+      "sourceBounds" : [
+        205,
+        75,
+        966,
+        999
+      ]
+    }
+  ],
+  "coordinateSystem" : "source canvas, y up",
+  "source" : "artwork\/cutout\/claude-code\/source-sheet.png",
+  "sourceSize" : [
+    1024,
+    1536
+  ]
+}

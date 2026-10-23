@@ -24,6 +24,8 @@ struct CutoutRig: Codable {
         /// Optional static orientation around a source-canvas attachment point.
         var rotation: Double? = nil
         var pivot: [Double]? = nil
+        /// Source-canvas polygon removed once during material preparation.
+        var maskOut: [[Double]]? = nil
     }
     struct Variant: Codable {
         var id: String
@@ -31,6 +33,10 @@ struct CutoutRig: Codable {
         var category: String
         var attachments: [Attachment]
         var underlaps: [Underlap]?
+        /// nil inherits the rig default; an empty list disables cloth patches.
+        var clothDeformations: [ClothDeformation]? = nil
+        /// Garment-specific occlusion, prepared on swap rather than per frame.
+        var slotOrders: [String:Int]? = nil
         /// Offline union of supported motion bounds, in the original canvas.
         /// Gives native windows room for wider/taller styles without refitting art.
         var displayBounds: [Double]?
@@ -81,7 +87,7 @@ struct CutoutRig: Codable {
     }
     /// Small root-local cloth patch: shoulder motion fades to zero at waist.
     /// The owning slot stays on the root; joints use the named shoulder driver.
-    struct ClothDeformation: Codable {
+    struct ClothDeformation: Codable, Equatable {
         var slot: String
         var driver: String
         var region: [Double]
@@ -90,6 +96,15 @@ struct CutoutRig: Codable {
         var rows: Int
         var compression: Double
         var angleLimit: Double
+    }
+    /// A leaf control bends hair pixels while roots and all head joints stay put.
+    struct HairDeformation: Codable {
+        var slot: String
+        var driver: String
+        var rootY: Double
+        var tipY: Double
+        var maxOffset: Double
+        var rows: Int
     }
     var schemaVersion: Int
     var canvas: [Double]
@@ -117,6 +132,16 @@ struct CutoutRig: Codable {
     var eyeClips: [EyeClip]?
     var gazeRange: [Double]?
     var clothDeformations: [ClothDeformation]?
+    var hairDeformations: [HairDeformation]? = nil
+    /// One source-space crop for every clip and appearance. Never fit a pose.
+    var motionBounds: [Double]? = nil
+    /// Includes unique component pixels, expressions, masks and generated atlases.
+    var decodedByteLimit: Int? = nil
+    var cacheByteLimit: Int { decodedByteLimit ?? 24 * 1024 * 1024 }
+    var sharedMotionBounds: CGRect {
+        let b = motionBounds ?? [0, 0, canvas[0], canvas[1]]
+        return CGRect(x:b[0], y:b[1], width:b[2]-b[0], height:b[3]-b[1])
+    }
 
     func validated() throws -> CutoutRig {
         func check(_ condition: Bool, _ message: String) throws {
@@ -128,6 +153,12 @@ struct CutoutRig: Codable {
                   "Invalid cutout coordinate/display registration")
         try check(!bones.isEmpty && bones.count <= 64 && slots.count <= 96 && variants.count <= 64,
                   "Cutout rig exceeds its bounded component budget")
+        if let b = motionBounds {
+            try check(b.count == 4 && b.allSatisfy { $0.isFinite && abs($0) <= 4096 }
+                      && b[0] < b[2] && b[1] < b[3] && b[2]-b[0] <= 4096 && b[3]-b[1] <= 4096,
+                      "Invalid shared motion crop")
+        }
+        try check((1...64*1024*1024).contains(cacheByteLimit), "Invalid decoded cache byte limit")
         try check(artworkMode == nil || ["cropped", "redrawn"].contains(artworkMode!), "Unknown cutout artwork mode")
         var seen = Set<String>()
         for (index, bone) in bones.enumerated() {
@@ -159,9 +190,20 @@ struct CutoutRig: Codable {
             !$0.id.isEmpty && boneIDs.contains($0.bone) && !$0.category.isEmpty
         }, "Invalid or duplicate attachment slot")
         let bySlot = Dictionary(uniqueKeysWithValues: slots.map { ($0.id, $0) })
-        let cloth=clothDeformations ?? []
-        try check(cloth.count<=4 && Set(cloth.map(\.slot)).count==cloth.count,"Too many or duplicate cloth patches")
-        for patch in cloth {
+        let hair=hairDeformations ?? []
+        try check(hair.count<=8 && Set(hair.map(\.slot)).count==hair.count,"Invalid hair deformation count")
+        for patch in hair {
+            try check(bySlot[patch.slot]?.category == "hair" && boneIDs.contains(patch.driver)
+                      && slots.allSatisfy({$0.bone != patch.driver}) && bones.allSatisfy({$0.parent != patch.driver})
+                      && patch.rootY.isFinite && patch.tipY.isFinite && abs(patch.rootY)<=2048 && abs(patch.tipY)<=2048
+                      && abs(patch.rootY-patch.tipY)>=1 && patch.maxOffset.isFinite && (0...24).contains(patch.maxOffset)
+                      && (4...16).contains(patch.rows),"Invalid pinned hair-layer deformation")
+        }
+        let clothConfigurations=[clothDeformations ?? []]+variants.compactMap(\.clothDeformations)
+        let cloth=clothConfigurations.flatMap { $0 }
+        for configuration in clothConfigurations {
+          try check(configuration.count<=4 && Set(configuration.map(\.slot)).count==configuration.count,"Too many or duplicate cloth patches")
+          for patch in configuration {
             try check(bySlot[patch.slot]?.bone==bones.first?.id && boneIDs.contains(patch.driver)
                       && bones[boneIndex[patch.driver]!].parent==bones.first?.id
                       && patch.region.count==4 && patch.region.allSatisfy(\.isFinite)
@@ -172,6 +214,7 @@ struct CutoutRig: Codable {
                       && (2...12).contains(patch.rows) && patch.compression.isFinite && (0...0.03).contains(patch.compression)
                       && patch.angleLimit.isFinite && patch.angleLimit>0 && patch.angleLimit<=6,
                       "Invalid local shoulder/waist cloth deformation")
+          }
         }
         let eyes=eyeClips ?? []
         try check(eyes.count<=4 && Set(eyes.map(\.iris)).count==eyes.count && eyes.allSatisfy {
@@ -204,6 +247,26 @@ struct CutoutRig: Codable {
         }
         try check(Set(variants.map(\.id)).count == variants.count, "Duplicate cutout variant")
         for variant in variants {
+            if let orders=variant.slotOrders {
+                try check(variant.category == "clothes" && orders.count<=slots.count && orders.allSatisfy { id,order in
+                    guard let slot=bySlot[id] else {return false}
+                    return (-128...128).contains(order) && (slot.category == "identity" || variant.attachments.contains {$0.slot==id})
+                        && !(composites ?? []).contains {$0.slots.contains(id)}
+                },"Draw-order overrides require known identity or owned clothing slots")
+                let ordered=slots.enumerated().sorted { a,b in
+                    let x=orders[a.element.id] ?? a.element.order,y=orders[b.element.id] ?? b.element.order
+                    return x==y ? a.offset<b.offset : x<y
+                }.map(\.element)
+                for group in composites ?? [] {
+                    let indices=ordered.indices.filter {group.slots.contains(ordered[$0].id)}
+                    try check(indices.last!-indices.first!+1==indices.count,"Garment draw order separates a local composite")
+                }
+            }
+            if let patches=variant.clothDeformations {
+                try check(variant.category == "clothes" && patches.allSatisfy { patch in
+                    variant.attachments.contains { $0.slot == patch.slot }
+                },"Cloth overrides require an owning clothing attachment")
+            }
             if let b=variant.displayBounds {
                 try check(b.count==4 && b.allSatisfy { $0.isFinite && abs($0)<=2048 }
                           && b[0]<b[2] && b[1]<b[3], "Invalid appearance display bounds")
@@ -212,12 +275,17 @@ struct CutoutRig: Codable {
                       && Set(variant.attachments.map(\.slot)).count == variant.attachments.count,
                       "Invalid or duplicate variant attachments")
             for part in variant.attachments {
+                if let polygon=part.maskOut {
+                    try check((3...32).contains(polygon.count) && polygon.allSatisfy {
+                        pair($0) && $0.allSatisfy {abs($0)<=2048}
+                    },"Invalid attachment exclusion polygon")
+                }
                 if let angle=part.rotation {
                     try check(angle.isFinite && abs(angle)<=30 && part.pivot?.count==2
                               && part.pivot!.allSatisfy { $0.isFinite && abs($0)<=2048 }
                               && !(composites ?? []).contains(where: { $0.slots.contains(part.slot) })
                               && expressions?[part.slot]==nil
-                              && !(clothDeformations ?? []).contains(where: { $0.slot==part.slot }),
+                              && !cloth.contains(where: { $0.slot==part.slot }),
                               "Static orientation requires an independent attachment and finite pivot")
                 } else {try check(part.pivot==nil,"Attachment pivot requires a static orientation")}
                 try check(bySlot[part.slot]?.category == variant.category
@@ -294,6 +362,7 @@ struct CutoutTransform: Codable, Equatable {
 }
 
 struct CutoutMotionLibrary: Codable {
+    enum Interpolation: String, Codable { case smooth, step }
     struct ScalarKey: Codable {
         var time: Double
         var value: Double
@@ -305,6 +374,7 @@ struct CutoutMotionLibrary: Codable {
     struct Track: Codable {
         var bone: String
         var keys: [Key]
+        var interpolation: Interpolation? = nil
     }
     struct Clip: Codable {
         var id: String
@@ -316,9 +386,21 @@ struct CutoutMotionLibrary: Codable {
         var constraints: [String]?
         /// Optional authored lid timing; manual eyes remain independent.
         var blink: [ScalarKey]?
+        /// Durations of the sorted union of bone/lid key intervals, in seconds.
+        /// Sampling remains continuous; no full-body bitmap frames are generated.
+        var frameDurations: [Double]? = nil
+        var startPose: String? = nil
+        var endPose: String? = nil
+        /// Non-looping clips hold their endpoint when absent.
+        var fallback: String? = nil
+        var interpolation: Interpolation? = nil
+        /// Optional source-frame IDs for checking an authored cadence.
+        var referenceFrames: [Int]? = nil
     }
     var schemaVersion: Int
     var clips: [Clip]
+    /// Unspecified bones in a named pose use their bind-pose delta (identity).
+    var poses: [String: [String: CutoutTransform]]? = nil
 }
 
 /// Compiled indices avoid searching IDs or reparsing JSON on each tick. Clips
@@ -327,15 +409,18 @@ final class CutoutPlayer {
     struct Track {
         let bone: Int
         let keys: [CutoutMotionLibrary.Key]
+        var stepped = false
         func value(at t: Double) -> CutoutTransform {
             guard let first = keys.first, let last = keys.last else { return .identity }
             if t <= first.time { return first.value }
             if t >= last.time { return last.value }
+            let time = stepped ? t+1e-9 : t
             var low = 0, high = keys.count-1
             while high-low > 1 {
                 let middle = (low+high)/2
-                if keys[middle].time <= t { low = middle } else { high = middle }
+                if keys[middle].time <= time { low = middle } else { high = middle }
             }
+            if stepped { return keys[low].value }
             let a = keys[low], b = keys[high], w = (t-a.time)/(b.time-a.time)
             return .blend(a.value, b.value, w*w*(3-2*w))
         }
@@ -345,6 +430,39 @@ final class CutoutPlayer {
         let tracks: [Track]
         let constraintIndices: Set<Int>
         let blinkTrack: Track?
+        let keyTimes: [Double]
+        let frameEnds: [Double]
+        let duration: Double
+        let identityTiming: Bool
+        private func frameIndex(at t:Double)->Int {
+            var low=0,high=frameEnds.count-1
+            while low<high {
+                let middle=(low+high)/2
+                if t+1e-9 < frameEnds[middle] {high=middle} else {low=middle+1}
+            }
+            return low
+        }
+        func referenceFrame(at elapsed:Double)->Int? {
+            guard let frames=definition.referenceFrames else {return nil}
+            let t=definition.loop ? max(0,elapsed).truncatingRemainder(dividingBy:duration):min(max(0,elapsed),duration)
+            return frames[frameIndex(at:t)]
+        }
+        func remainingFrameTime(at elapsed:Double)->Double {
+            let t=definition.loop ? max(0,elapsed).truncatingRemainder(dividingBy:duration):min(max(0,elapsed),duration)
+            return max(0.0001,frameEnds[frameIndex(at:t)]-t)
+        }
+        func phase(at elapsed: Double) -> Double {
+            let t = definition.loop ? elapsed.truncatingRemainder(dividingBy:duration) : min(elapsed,duration)
+            if identityTiming { return t }
+            if t >= duration { return definition.duration }
+            var low = 0, high = frameEnds.count-1
+            while low < high {
+                let mid = (low+high)/2
+                if t < frameEnds[mid] { high = mid } else { low = mid+1 }
+            }
+            let start = low == 0 ? 0 : frameEnds[low-1]
+            return keyTimes[low] + (keyTimes[low+1]-keyTimes[low]) * (t-start)/(frameEnds[low]-start)
+        }
     }
     private struct Constraint {
         let upper:Int, middle:Int, end:Int, target:Int
@@ -373,6 +491,7 @@ final class CutoutPlayer {
     private(set) var sampledTracks = 0
     private(set) var constraintSolves = 0
     private(set) var constraintRecomputedBones = 0
+    private var inspectionTime: Double?
 
     init(rig: CutoutRig, motions: CutoutMotionLibrary) throws {
         self.rig = try rig.validated()
@@ -409,6 +528,13 @@ final class CutoutPlayer {
               Set(motions.clips.map(\.id)).count == motions.clips.count else {
             throw CutoutError.invalid("Invalid motion library")
         }
+        let poses = motions.poses ?? [:]
+        guard poses.count <= 64, poses.allSatisfy({ id, pose in
+            !id.isEmpty && pose.allSatisfy { bone, v in
+                boneIndices[bone] != nil && v.x.isFinite && v.y.isFinite && v.rotation.isFinite
+                    && abs(v.x) <= 2048 && abs(v.y) <= 2048 && abs(v.rotation) <= 360
+            }
+        }) else { throw CutoutError.invalid("Invalid named endpoint pose") }
         clips = try motions.clips.map { clip in
             let active=clip.constraints ?? []
             guard Set(active).count==active.count,active.allSatisfy({constraintIndices[$0] != nil}) else {
@@ -439,7 +565,7 @@ final class CutoutPlayer {
                 if clip.loop, track.keys.first!.value != track.keys.last!.value {
                     throw CutoutError.invalid("Loop must preserve its endpoint pose")
                 }
-                return Track(bone: index, keys: track.keys)
+                return Track(bone: index, keys: track.keys,stepped:(track.interpolation ?? clip.interpolation) == .step)
             }
             var blinkTrack:Track?
             if let keys=clip.blink {
@@ -455,9 +581,58 @@ final class CutoutPlayer {
                     }
                     previous=key.time
                 }
-                blinkTrack=Track(bone:-1,keys:keys.map{.init(time:$0.time,value:.init(x:$0.value,y:0,rotation:0))})
+                blinkTrack=Track(bone:-1,keys:keys.map{.init(time:$0.time,value:.init(x:$0.value,y:0,rotation:0))},stepped:clip.interpolation == .step)
             }
-            return Clip(definition: clip, tracks: tracks,constraintIndices:Set(active.map{constraintIndices[$0]!}),blinkTrack:blinkTrack)
+            for (name, end) in [(clip.startPose, false), (clip.endPose, true)] {
+                if let name {
+                    guard let pose = poses[name], rig.bones.enumerated().allSatisfy({ i, bone in
+                        let value = tracks.first { $0.bone == i }.map { end ? $0.keys.last!.value : $0.keys.first!.value } ?? .identity
+                        return value == (pose[bone.id] ?? .identity)
+                    }) else { throw CutoutError.invalid("Clip \(clip.id) violates its locked endpoint pose") }
+                }
+            }
+            let times = Array(Set([0,clip.duration] + tracks.flatMap { $0.keys.map(\.time) }
+                + (clip.blink ?? []).map(\.time))).sorted()
+            let original = zip(times,times.dropFirst()).map { $1-$0 }
+            let durations = clip.frameDurations ?? original
+            guard durations.count == original.count, durations.allSatisfy({ $0.isFinite && $0 >= 0.001 && $0 <= 120 }),
+                  durations.reduce(0,+) <= 120, !clip.loop || clip.fallback == nil else {
+                throw CutoutError.invalid("Invalid frame durations or looping fallback")
+            }
+            if let frames=clip.referenceFrames {
+                guard clip.interpolation == .step, frames.count==durations.count,
+                      frames.allSatisfy({(0...255).contains($0)}) else {
+                    throw CutoutError.invalid("Invalid reference-frame cadence")
+                }
+            }
+            let identity = zip(durations,original).allSatisfy { abs($0-$1) < 1e-10 }
+            var total = 0.0
+            let ends = durations.map { total += $0; return total }
+            let playbackDuration=(total*1e12).rounded()/1e12
+            return Clip(definition: clip, tracks: tracks,constraintIndices:Set(active.map{constraintIndices[$0]!}),blinkTrack:blinkTrack,
+                        keyTimes:times,frameEnds:ends,duration:identity ? clip.duration : playbackDuration,identityTiming:identity)
+        }
+        for clip in clips {
+            if let fallback = clip.definition.fallback {
+                guard let target = clips.first(where: { $0.definition.id == fallback }),
+                      target.definition.id != clip.definition.id,
+                      clip.constraintIndices == target.constraintIndices,
+                      (clip.definition.grounded == true) == (target.definition.grounded == true),
+                      rig.bones.indices.allSatisfy({ i in
+                          (clip.tracks.first { $0.bone == i }?.keys.last?.value ?? .identity)
+                            == (target.tracks.first { $0.bone == i }?.keys.first?.value ?? .identity)
+                      }), (clip.blinkTrack?.keys.last?.value.x ?? 0) == (target.blinkTrack?.keys.first?.value.x ?? 0) else {
+                    throw CutoutError.invalid("Fallback must preserve body, constraints and lid endpoints")
+                }
+            }
+            var visited = Set<String>(), current = clip
+            while let next = current.definition.fallback {
+                guard visited.insert(current.definition.id).inserted,
+                      let target = clips.first(where: { $0.definition.id == next }) else {
+                    throw CutoutError.invalid("Cyclic or missing fallback")
+                }
+                current = target
+            }
         }
         sample(at: 0)
     }
@@ -470,23 +645,41 @@ final class CutoutPlayer {
         source = local
         sourceConstraintWeights = constraintWeights
         clipIndex = index; startedAt = now; transitionStarted = now
-        transitionDuration = max(0, min(2, transition))
+        transitionDuration = max(0, min(2, transition, clips[index].duration))
+        inspectionTime = nil
         return true
     }
 
     func seek(to phase:Double,at now:Double) {
         guard phase.isFinite,now.isFinite else { return }
-        startedAt = now-min(clips[clipIndex].definition.duration,max(0,phase))
+        startedAt = now-min(clips[clipIndex].duration,max(0,phase))
         transitionDuration = 0
+        inspectionTime = now
         sample(at:now)
+    }
+
+    /// Resolve by absolute elapsed time, including late ticks. No timer or I/O.
+    private func resolveCompletion(at now: Double) {
+        guard inspectionTime != now else { return }
+        inspectionTime = nil
+        for _ in 0..<clips.count {
+            let clip = clips[clipIndex]
+            guard !clip.definition.loop, now-startedAt >= clip.duration,
+                  let id = clip.definition.fallback,
+                  let index = clips.firstIndex(where: { $0.definition.id == id }) else { return }
+            startedAt += clip.duration; clipIndex = index
+            transitionDuration = 0
+            sourceConstraintWeights = constraints.indices.map { clips[index].constraintIndices.contains($0) ? 1 : 0 }
+        }
     }
 
     /// Uses the same clip clock and compiled key sampler as skeletal motion.
     /// Caller supplies ordinary blinking when a clip has no authored lids.
     func automaticBlink(at now:Double,fallback:Double)->Double {
         guard now.isFinite else {return fallback}
+        resolveCompletion(at:now)
         let clip=clips[clipIndex],elapsed=max(0,now-startedAt)
-        let phase=clip.definition.loop ? elapsed.truncatingRemainder(dividingBy:clip.definition.duration):min(elapsed,clip.definition.duration)
+        let phase=clip.phase(at:elapsed)
         let target=clip.blinkTrack?.value(at:phase).x ?? fallback
         let blend=transitionDuration>0 ? min(1,max(0,(now-transitionStarted)/transitionDuration)):1
         let weight=blend*blend*(3-2*blend)
@@ -495,9 +688,9 @@ final class CutoutPlayer {
 
     func sample(at now: Double, gaze: CGPoint = .zero, mouth: Double = 0, blink: Double = 0) {
         guard now.isFinite else { return }
+        resolveCompletion(at:now)
         let clip = clips[clipIndex], elapsed = max(0, now-startedAt)
-        let t = clip.definition.loop ? elapsed.truncatingRemainder(dividingBy: clip.definition.duration)
-            : min(elapsed, clip.definition.duration)
+        let t = clip.phase(at:elapsed)
         for i in local.indices { local[i] = .identity }
         for track in clip.tracks { local[track.bone] = track.value(at: t) }
         let blend = transitionDuration > 0 ? min(1, max(0, (now-transitionStarted)/transitionDuration)) : 1

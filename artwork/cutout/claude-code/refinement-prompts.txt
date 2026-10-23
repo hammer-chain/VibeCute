@@ -1,0 +1,12 @@
+Mode: built-in image_gen, transparent background.
+
+Sleeveless body edit target: shipped first-fit topwear.png.
+Reference: OrangeHoodieThinking/thinking-atlas.png.
+
+Use case: precise-object-edit. Edit target: image 1, the isolated ivory hoodie torso and orange pleated skirt. Image 2 is the original character outfit reference atlas, for outfit style only.
+Make a clean sleeveless clothing body sprite for a 2D skeletal cutout rig. Preserve the exact hoodie+skirt silhouette, canvas proportions, ivory fabric, orange bow/drawstrings, pocket, skirt, white ruffled hem, shading and fine anime linework. Remove ONLY the two little rounded sleeve stubs protruding beside the shoulders (left and right of the hood, near the bow). Replace these with a narrow continuous body-side contour below the hood; NO sleeves, NO shoulder puffs, NO armhole interior ellipses, NO arms/hands. Independent arm sprites will be layered over this body. The folded hood itself remains. Keep every other detail. Transparent background, no checkerboard, no shadow around sprite, no text. Center single garment on transparent canvas, entirety visible.
+
+Hair ornament reference: OrangeHoodieThinking/thinking-atlas.png.
+
+Use case: logo-brand. Create ONLY the small orange hair ornament from the character in reference image 1 (the orange ornament at the viewer-right temple in every frame), as an isolated transparent sprite.
+It is an orange 8-spoke asterisk/starburst, not a flower. Exactly EIGHT distinct thin rounded straight radial rays at up, upper-right, right, lower-right, down, lower-left, left and upper-left, joined at the center. Long slim spokes with rounded tips, slight hand-drawn anime finish and very subtle warm edge shading. Keep the same orange/coral color and upright orientation as the reference. The reference hair ornament has no round flower petals, no central disk, no leaves, no stem, no hair clip hardware, no black outline, no background. Single upright 8-ray orange asterisk fully visible with generous transparent margin, on square transparent canvas. No text, no character.

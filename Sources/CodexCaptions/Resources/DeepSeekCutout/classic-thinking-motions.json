@@ -6,7 +6,12 @@
       "title": "原位组装 · 中性",
       "duration": 4,
       "loop": true,
-      "tracks": []
+      "tracks": [],
+      "frameDurations": [
+        4
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral"
     },
     {
       "id": "thinking",
@@ -360,7 +365,39 @@
             }
           ]
         }
-      ]
+      ],
+      "frameDurations": [
+        0.55,
+        0.15,
+        0.4,
+        0.35,
+        0.15,
+        0.35,
+        0.65,
+        0.7,
+        0.1,
+        0.15,
+        0.25,
+        0.5,
+        0.15,
+        0.2,
+        0.2,
+        0.1,
+        0.05,
+        0.4,
+        0.35,
+        0.15,
+        0.3,
+        0.6,
+        0.2,
+        0.15,
+        0.25,
+        0.4,
+        0.15,
+        0.05
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral"
     },
     {
       "id": "thinking-classic",
@@ -375,7 +412,7 @@
           "bone": "torso",
           "keys": [
             {
-              "time": 0,
+              "time": 0.0,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -383,7 +420,7 @@
               }
             },
             {
-              "time": 1.0,
+              "time": 0.16,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -391,7 +428,47 @@
               }
             },
             {
-              "time": 1.1,
+              "time": 0.32,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.48,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.64,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.96,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.12,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -399,7 +476,7 @@
               }
             },
             {
-              "time": 1.36,
+              "time": 1.28,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -415,15 +492,7 @@
               }
             },
             {
-              "time": 1.52,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": -0.75
-              }
-            },
-            {
-              "time": 1.62,
+              "time": 1.6,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -431,7 +500,7 @@
               }
             },
             {
-              "time": 1.84,
+              "time": 1.76,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -439,23 +508,47 @@
               }
             },
             {
-              "time": 1.9,
+              "time": 1.92,
               "value": {
                 "x": 0,
                 "y": 0,
-                "rotation": 0.1
+                "rotation": 0
               }
             },
             {
-              "time": 2.76,
+              "time": 2.08,
               "value": {
                 "x": 0,
                 "y": 0,
-                "rotation": 0.1
+                "rotation": 0
               }
             },
             {
-              "time": 2.87,
+              "time": 2.24,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.56,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.72,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -476,7 +569,7 @@
           "bone": "head",
           "keys": [
             {
-              "time": 0,
+              "time": 0.0,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -484,7 +577,7 @@
               }
             },
             {
-              "time": 1.0,
+              "time": 0.16,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -492,19 +585,43 @@
               }
             },
             {
-              "time": 1.02,
+              "time": 0.32,
               "value": {
                 "x": 0,
                 "y": 0,
-                "rotation": 0.10400000000000002
+                "rotation": 0.0
               }
             },
             {
-              "time": 1.1,
+              "time": 0.48,
               "value": {
                 "x": 0,
                 "y": 0,
-                "rotation": -7.064000000000002
+                "rotation": 0.0
+              }
+            },
+            {
+              "time": 0.64,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0.0
+              }
+            },
+            {
+              "time": 0.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.72255107
+              }
+            },
+            {
+              "time": 0.96,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -0.72255107
               }
             },
             {
@@ -512,132 +629,7 @@
               "value": {
                 "x": 0,
                 "y": 0,
-                "rotation": -8.0
-              }
-            },
-            {
-              "time": 1.36,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": -8.0
-              }
-            },
-            {
-              "time": 1.44,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": -6.25
-              }
-            },
-            {
-              "time": 1.52,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": -6.25
-              }
-            },
-            {
-              "time": 1.6,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.07799999999999985
-              }
-            },
-            {
-              "time": 1.62,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.0
-              }
-            },
-            {
-              "time": 1.84,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.0
-              }
-            },
-            {
-              "time": 1.9,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.7437499999999992
-              }
-            },
-            {
-              "time": 1.92,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.9
-              }
-            },
-            {
-              "time": 2.76,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.9
-              }
-            },
-            {
-              "time": 2.8,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.930052592036063
-              }
-            },
-            {
-              "time": 2.87,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.04296874999999811
-              }
-            },
-            {
-              "time": 2.88,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.0
-              }
-            }
-          ]
-        },
-        {
-          "bone": "hair-back",
-          "keys": [
-            {
-              "time": 0,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0
-              }
-            },
-            {
-              "time": 1.02,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0
-              }
-            },
-            {
-              "time": 1.15,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": 0.28
+                "rotation": -8.20582351
               }
             },
             {
@@ -645,31 +637,23 @@
               "value": {
                 "x": 0,
                 "y": 0,
-                "rotation": -0.1
+                "rotation": -8.20582351
               }
             },
             {
-              "time": 1.36,
+              "time": 1.44,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -4.13626586
+              }
+            },
+            {
+              "time": 1.6,
               "value": {
                 "x": 0,
                 "y": 0,
                 "rotation": 0
-              }
-            },
-            {
-              "time": 1.48,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": -0.18
-              }
-            },
-            {
-              "time": 1.63,
-              "value": {
-                "x": 0,
-                "y": 0,
-                "rotation": -0.28
               }
             },
             {
@@ -677,23 +661,15 @@
               "value": {
                 "x": 0,
                 "y": 0,
-                "rotation": 0.1
-              }
-            },
-            {
-              "time": 1.88,
-              "value": {
-                "x": 0,
-                "y": 0,
                 "rotation": 0
               }
             },
             {
-              "time": 1.96,
+              "time": 1.92,
               "value": {
                 "x": 0,
                 "y": 0,
-                "rotation": -0.1
+                "rotation": 0
               }
             },
             {
@@ -705,7 +681,346 @@
               }
             },
             {
-              "time": 2.8,
+              "time": 2.24,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.56,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.72,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.88,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "hair-back",
+          "keys": [
+            {
+              "time": 0.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.16,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.32,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.48,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.64,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.96,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.12,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.28,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.44,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.6,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.76,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.92,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.08,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.24,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.56,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.72,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.88,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "hair-return",
+          "interpolation": "smooth",
+          "keys": [
+            {
+              "time": 0.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.16,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.32,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.48,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.64,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.8,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 0.96,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.12,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.28,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.44,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.6,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.76,
+              "value": {
+                "x": 1,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.92,
+              "value": {
+                "x": -0.6,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.08,
+              "value": {
+                "x": 0.3,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.24,
+              "value": {
+                "x": -0.12,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.4,
+              "value": {
+                "x": 0.04,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.56,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 2.72,
               "value": {
                 "x": 0,
                 "y": 0,
@@ -725,11 +1040,39 @@
       ],
       "blink": [
         {
-          "time": 0,
+          "time": 0.0,
           "value": 0
         },
         {
-          "time": 1.4,
+          "time": 0.16,
+          "value": 0
+        },
+        {
+          "time": 0.32,
+          "value": 0
+        },
+        {
+          "time": 0.48,
+          "value": 0
+        },
+        {
+          "time": 0.64,
+          "value": 0
+        },
+        {
+          "time": 0.8,
+          "value": 0
+        },
+        {
+          "time": 0.96,
+          "value": 0
+        },
+        {
+          "time": 1.12,
+          "value": 0
+        },
+        {
+          "time": 1.28,
           "value": 0
         },
         {
@@ -737,15 +1080,7 @@
           "value": 0.7
         },
         {
-          "time": 1.56,
-          "value": 0.7
-        },
-        {
           "time": 1.6,
-          "value": 1
-        },
-        {
-          "time": 1.72,
           "value": 1
         },
         {
@@ -753,9 +1088,76 @@
           "value": 0
         },
         {
+          "time": 1.92,
+          "value": 0
+        },
+        {
+          "time": 2.08,
+          "value": 0
+        },
+        {
+          "time": 2.24,
+          "value": 0
+        },
+        {
+          "time": 2.4,
+          "value": 0
+        },
+        {
+          "time": 2.56,
+          "value": 0
+        },
+        {
+          "time": 2.72,
+          "value": 0
+        },
+        {
           "time": 2.88,
           "value": 0
         }
+      ],
+      "frameDurations": [
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16,
+        0.16
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral",
+      "interpolation": "step",
+      "referenceFrames": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        2,
+        2,
+        3,
+        4,
+        5,
+        6,
+        6,
+        7,
+        7,
+        7,
+        7
       ]
     },
     {
@@ -809,7 +1211,15 @@
             }
           ]
         }
-      ]
+      ],
+      "frameDurations": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral"
     },
     {
       "id": "hair-sway",
@@ -907,7 +1317,15 @@
             }
           ]
         }
-      ]
+      ],
+      "frameDurations": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral"
     },
     {
       "id": "head-sway",
@@ -963,7 +1381,15 @@
       ],
       "constraints": [
         "right-chin-contact"
-      ]
+      ],
+      "frameDurations": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral"
     },
     {
       "id": "arm-probe",
@@ -1016,7 +1442,15 @@
             }
           ]
         }
-      ]
+      ],
+      "frameDurations": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral"
     },
     {
       "id": "right-elbow-probe",
@@ -1114,7 +1548,276 @@
             }
           ]
         }
+      ],
+      "frameDurations": [
+        1,
+        1,
+        1,
+        1
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral"
+    },
+    {
+      "id": "sleeve-joints-probe",
+      "title": "双袖屈肘 · 工服接缝",
+      "duration": 4,
+      "loop": true,
+      "tracks": [
+        {
+          "bone": "right-elbow",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 12
+              }
+            },
+            {
+              "time": 2,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -12
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "right-wrist",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -8
+              }
+            },
+            {
+              "time": 2,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 8
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "left-elbow",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -12
+              }
+            },
+            {
+              "time": 2,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 12
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        },
+        {
+          "bone": "left-wrist",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 8
+              }
+            },
+            {
+              "time": 2,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -8
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral",
+      "frameDurations": [
+        1,
+        1,
+        1,
+        1
       ]
+    },
+    {
+      "id": "tail-wag-once",
+      "title": "摇尾一次后休息",
+      "duration": 4,
+      "loop": false,
+      "tracks": [
+        {
+          "bone": "tail",
+          "keys": [
+            {
+              "time": 0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 1.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 6
+              }
+            },
+            {
+              "time": 2.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            },
+            {
+              "time": 3.0,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": -6
+              }
+            },
+            {
+              "time": 4,
+              "value": {
+                "x": 0,
+                "y": 0,
+                "rotation": 0
+              }
+            }
+          ]
+        }
+      ],
+      "frameDurations": [
+        0.3,
+        0.5,
+        0.7,
+        0.5
+      ],
+      "startPose": "seated-neutral",
+      "endPose": "seated-neutral",
+      "fallback": "idle"
     }
-  ]
+  ],
+  "poses": {
+    "seated-neutral": {}
+  }
 }

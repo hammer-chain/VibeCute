@@ -15,6 +15,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         #if !VIBECUTE_RELEASE
+        if CommandLine.arguments.contains("--cutout-compare"),
+           CommandLine.arguments.contains("--cutout-rhythm-smoke-out") || CommandLine.arguments.contains("--cutout-drag-smoke-out") {
+            NSApp.setActivationPolicy(.regular)
+            CutoutComparisonController.shared.show()
+            return
+        }
         if CommandLine.arguments.contains("--cutout-studio") {
             NSApp.setActivationPolicy(.regular)
             CutoutStudioController.shared.show()
@@ -51,6 +57,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         #if !VIBECUTE_RELEASE
         if CommandLine.arguments.contains("--cutout-compare") {
             DispatchQueue.main.async { CutoutComparisonController.shared.show() }
+        }
+        if CommandLine.arguments.contains("--cutout-workbench") {
+            DispatchQueue.main.async { CutoutStudioController.shared.show() }
         }
         #endif
         if !BuildProfile.isRelease && CommandLine.arguments.contains("--developer-mode") {
