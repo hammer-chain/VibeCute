@@ -1,8 +1,8 @@
 # VibeCute
 
-让Agent的工作状态，变成桌面上看得见的陪伴。
+VibeCute 是一款原生 macOS 菜单栏应用，通过桌面角色和字幕展示 AI 工具的工作状态、进度、回复与提问。它读取所选工具的本地会话数据，也支持不连接工具的独立陪伴，以及随声音变化的口型和唱歌动作。
 
-VibeCute （目前）是一款使用 Swift、AppKit 和 SwiftUI 构建的原生 macOS 菜单栏应用。它读取所选 AI 工具的本地会话数据，用桌面角色和字幕展示工作进度、回复与提问，也支持独立于会话的桌面陪伴，以及随声音变化的口型和唱歌动作。
+安装使用见[安装](#安装)，开发和打包见[从源码构建](#从源码构建)。项目使用 Swift、AppKit 和 SwiftUI 构建。
 
 ## 界面预览
 
@@ -10,8 +10,7 @@ VibeCute （目前）是一款使用 Swift、AppKit 和 SwiftUI 构建的原生 
 
 ![多个演示对话与桌面角色](docs/images/multiple-conversations.png)
 
-
-## 功能
+## 主要功能
 
 - **连接 AI 工具**：支持 Codex、Claude Code、DeepSeek、豆包、OpenCode 和 WorkBuddy；实际可显示的信息取决于相应工具的本地数据。
 - **桌面角色与字幕**：呈现工作状态、回复和提问，支持角色绑定、逐字显示与闲置互动。
@@ -29,15 +28,40 @@ VibeCute （目前）是一款使用 Swift、AppKit 和 SwiftUI 构建的原生 
 | Apple Silicon（M 系列芯片） | 文件名含 `arm64` 的 DMG |
 | Intel | 文件名含 `x86_64` 的 DMG |
 
-打开对应的 DMG，将 **VibeCute.app** 拖入 **Applications**，再从应用程序目录启动。首次运行按新手引导设置权限，并选择需要连接的工具。连接功能需要本地存在对应工具生成的可读取会话数据。
+连接 AI 工具前，本地需已有对应工具生成的可读取会话数据。
 
-版本更新见 [Changelog](CHANGELOG.md)，安装包见 [GitHub Releases](https://github.com/hammer-chain/VibeCute/releases)。当前构建使用持久的本机证书签名，**尚未经过 Apple 公证**。Intel 构建通过 Rosetta 回归检查；原生 Intel 真机的实时音频性能尚未验收。
+1. 打开对应架构的 DMG。
+2. 将 **VibeCute.app** 拖入 **Applications**。
+3. 从应用程序目录启动 VibeCute。
+4. 按新手引导设置权限，选择需要连接的工具。
+
+安装包见 [GitHub Releases](https://github.com/hammer-chain/VibeCute/releases)，版本更新见[更新日志](CHANGELOG.md)。
+
+当前构建使用持久的本机证书签名，**尚未经过 Apple 公证**。Intel 构建已通过 Rosetta 回归检查，但原生 Intel 真机的实时音频性能尚未验收。
 
 ### 连接 DeepSeek Harness（DSH）
 
-先安装并打开 DSH，完成它的首次设置。在 VibeCute 新手引导中选择 **DeepSeek Harness**，点击 **启用连接…** 并确认；显示“已连接”后继续。插件随 VibeCute 打包，无需终端或额外安装 Python、Node。也可以选择“只同步字幕”。
+先安装并打开 DSH，完成首次设置。
 
-以后可在 **设置 → AI 工具与角色 → DeepSeek Harness** 检查状态或点击 **修复连接…**。修复前自动备份 DSH 配置，只补回 VibeCute 条目，保留其他插件。其他工具修改 DSH 配置时，应保留 VibeCute 标记区块；VibeCute 不会在后台自动重写配置。
+1. 在 VibeCute 新手引导中选择 **DeepSeek Harness**。
+2. 点击 **启用连接…** 并确认。
+3. 显示「已连接」后继续。
+
+插件随 VibeCute 打包，无需使用终端或额外安装 Python、Node。也可以选择「只同步字幕」。
+
+后续可在 **设置 → AI 工具与角色 → DeepSeek Harness** 检查状态，或点击 **修复连接…**。VibeCute 会在修复前自动备份 DSH 配置，只补回 VibeCute 条目，并保留其他插件。
+
+其他工具修改 DSH 配置时，应保留 VibeCute 标记区块。VibeCute 不会在后台自动重写配置。
+
+## 桌面天气
+
+在偏好设置的「桌面雨」中，可手动开启雨效，也可选择城市，由应用每 15 分钟检测当前是否有雨。天气数据来自 Open-Meteo，无需 Apple 开发者账号，但需要联网；免费接口仅限非商业用途。
+
+晴天和阴天不显示效果。开发者模式可预览小雨、中雨、大雨、雪和雷雨。
+
+下雨时，蓝色大肥鱼会顶盆跑到前台窗口底边内侧，完整进入窗口后收盆并恢复思考；没有合适位置时，会在附近往返。
+
+天气音效默认关闭。菜单栏支持开关音效，并分别调节任务、雨雷和钢盆音量。详见[使用与数据边界](docs/desktop-weather.md)。
 
 ## 权限与数据
 
@@ -49,13 +73,9 @@ VibeCute 需要读取用户选择的工具会话目录。涉及截屏、系统�
 
 ## 从源码构建
 
-需要 Xcode Command Line Tools、Python 3、Git 和相应构建依赖。首次准备 BeatNet+ 时会下载固定版本的 CMake 和 ggml，并在项目的 `.build/` 中构建。
+构建需要 Xcode Command Line Tools、Python 3、Git 和相应依赖。首次准备 BeatNet+ 时，脚本会下载固定版本的 CMake 和 ggml，并在项目的 `.build/` 中构建。
 
-### 桌面天气
-
-偏好设置中的“桌面雨”可手动开启雨效，也可选择城市，每 15 分钟检测当前是否有雨。天气使用无需 Apple 开发者账号的 Open-Meteo 服务；需联网，免费接口限非商业用途。晴天和阴天不显示效果；开发者模式可预览小雨、中雨、大雨、雪和雷雨。天气音效默认关闭，菜单栏可直接开关并调节任务、雨雷和钢盆音量。蓝色大肥鱼会顶盆跑到前台窗口底边内侧，完整进入窗口后收盆、恢复思考；没有合适位置时在附近往返。详见[使用与数据边界](docs/desktop-weather.md)。
-
-## 开发版
+### 构建开发版
 
 ```sh
 xcode-select --install  # 已安装时跳过
@@ -69,7 +89,7 @@ bash scripts/build.sh development
 
 开发版保留未完成的实验功能；Whisper 和人声分离等可选运行时需另外准备，不会因构建开发版而自动下载。开发版使用独立的应用标识、偏好与缓存，可与正式版并存。
 
-### 正式版 DMG
+### 构建正式版 DMG
 
 完成依赖和签名准备后：
 
@@ -83,12 +103,11 @@ bash scripts/package-release.sh x86_64
 
 本机架构产物位于 `dist/release/`；Apple Silicon 上的 Intel 交叉构建产物位于 `dist/release/x86_64/`。Intel 交叉构建会另外编译 x86_64 版 BeatNet+ 与 Zstandard；运行 Intel 回归检查需要安装 Rosetta。
 
-正式版配置固定在 [`config/build-profiles/release.json`](config/build-profiles/release.json)：节拍方案仅 BeatNet+，口型方案为 MFCC；不打包 Kira 菜单与彩蛋、Apple Speech、Whisper、人声分离、CutOut、工作台和开发者工具。粉色小熊已退役，不随源码资源或构建产物分发。
+正式版构建配置位于 [`config/build-profiles/release.json`](config/build-profiles/release.json)：节拍方案仅使用 BeatNet+，口型方案为 MFCC；不打包 Kira 菜单与彩蛋、Apple Speech、Whisper、人声分离、CutOut、工作台和开发者工具。粉色小熊已退役，不随源码资源或构建产物分发。
 
-打包脚本执行签名、资源与架构检查、核心回归及 DMG 挂载回读。详细说明见 [发布文档](docs/RELEASE.md)。自己的持久签名证书可通过 `CAPTIONS_SIGNING_IDENTITY` 和 `CAPTIONS_SIGNING_KEYCHAIN` 配置；签名私钥不属于仓库内容。
+打包脚本执行签名、资源与架构检查、核心回归及 DMG 挂载回读。详细说明见 [发布文档](docs/RELEASE.md)。自有持久签名证书可通过 `CAPTIONS_SIGNING_IDENTITY` 和 `CAPTIONS_SIGNING_KEYCHAIN` 配置；签名私钥不属于仓库内容。
 
-## 开发与检查
-
+## 反馈与贡献
 
 欢迎提交 Issue 和 Pull Request。报告问题时请附上 macOS 版本、芯片架构、应用版本、复现步骤及脱敏后的必要信息。
 
@@ -105,8 +124,6 @@ VibeCute 的项目代码采用 [GNU General Public License v3.0](LICENSE)（SPDX
 **形象原作者：[上善无形](https://space.bilibili.com/4456176)、[ZipZipPipe](https://space.bilibili.com/4168597)。**
 
 角色形象及对应美术素材采用 [CC BY-NC-SA 4.0（署名—非商业性使用—相同方式共享）](https://creativecommons.org/licenses/by-nc-sa/4.0/)。使用或分发时须保留署名和许可链接；修改后须标明改动。不得用于商业目的，分发改编作品时须遵循相同方式共享要求。详见 [角色素材授权说明](LICENSE-ASSETS.md)。
-
-
 
 ### 第三方组件
 
