@@ -283,6 +283,7 @@ final class SubtitleView: NSView {
     private var mascot: MascotAnimation? {
         guard let mascotKind else { return nil }
         if mascotKind == .orangeHoodie { return MascotAnimation.orangeHoodie }
+        if mascotKind == .hybridHoodie { return MascotAnimation.hybridHoodie }
         return usesPinkBear ? MascotAnimation.pinkBear : mascots[mascotKind]
     }
     var mascotArtwork: String { usesPinkBear ? "pinkBear" : mascotSource }
@@ -290,6 +291,8 @@ final class SubtitleView: NSView {
         screenEdgeDock != nil ? ScreenEdgeArtwork.sequence : mascot?.playbackSequence ?? MascotAnimation.sequence
     }
     private var animationTimer: Timer?
+    private var animationStartedAt: TimeInterval?
+    private var hybridFinishAt: TimeInterval?
     private var requestedMascotAnimating = false
     private var rainShelterThinking = false
     private var balanceHungryRequested = false
@@ -733,7 +736,7 @@ final class SubtitleView: NSView {
     var mascotFrameIndex: Int { playbackSequence[sequenceIndex % playbackSequence.count] }
     private var characterHeight: CGFloat { showsMascot ? 168 * layoutScale : 0 }
     private var performanceHeadroom: CGFloat {
-        if mascotKind == .orangeHoodie { return 42 * layoutScale }
+        if mascotKind == .orangeHoodie || mascotKind == .hybridHoodie { return 42 * layoutScale }
         return !usesPinkBear && mascotKind == .deepseek &&
             (DeepSeekPerformance.shared.available || DeepSeekStroll.shared.available) ? 42 * layoutScale : 0
     }
@@ -916,6 +919,7 @@ final class SubtitleView: NSView {
     #endif
         if mode == .character {
             if mascotKind == .deepseek && !usesPinkBear { return 204 * layoutScale }
+            if mascotKind == .hybridHoodie { return 220 * layoutScale }
             return (performanceHeadroom > 0 ? 147 : 126) * layoutScale
         }
         let key = TextMeasureKey(text: text + (reservesWorkingDots ? " ..." : ""), fontSize: fontSize, scale: layoutScale, width: 0)
@@ -980,15 +984,22 @@ final class SubtitleView: NSView {
     }
 
     func setMascot(_ kind: CaptionMascot?, animating: Bool, pinkBear: Bool = false) {
+        if kind == .hybridHoodie, mascotKind == kind, requestedMascotAnimating, !animating, let start=animationStartedAt {
+            let elapsed=max(0,ProcessInfo.processInfo.systemUptime-start)
+            hybridFinishAt=start+(floor(elapsed/HybridThinkingSample.duration)+1)*HybridThinkingSample.duration
+        }
+        if animating || kind != .hybridHoodie {hybridFinishAt=nil}
         requestedMascotAnimating = animating
         if kind != mascotKind || pinkBear != usesPinkBear || mode != .character { cancelHeadPat() }
         if kind != mascotKind || pinkBear != usesPinkBear {
             sequenceIndex = 0; cancelSeatedRecovery(); basinRainSplash.clear()
+            animationTimer?.invalidate(); animationTimer = nil; animationStartedAt = nil; hybridFinishAt = nil
         }
         if kind != mascotKind || pinkBear != usesPinkBear {
             sleepSample = nil; hoodieSingingPose = nil; hoodieScootPose = nil; hoodieSingingPlayback = OrangeHoodieSingingPlayback()
         }
         mascotKind = kind
+        if kind == .hybridHoodie { _ = mascot?.hybridThinking }
         usesPinkBear = pinkBear && kind != nil
         #if !VIBECUTE_RELEASE
         if kind == .deepseekCutout && !usesPinkBear && mode != .bubble {
@@ -1015,10 +1026,17 @@ final class SubtitleView: NSView {
     }
 
     private func refreshMascotAnimation() {
-        if showsMascot && (requestedMascotAnimating || rainShelterThinking || screenEdgeDock != nil || balanceHungryRequested || hungryBasin.frame != nil) {
+        if showsMascot && (requestedMascotAnimating || hybridFinishAt != nil || rainShelterThinking || screenEdgeDock != nil || balanceHungryRequested || hungryBasin.frame != nil) {
             guard animationTimer == nil else { return }
-            let timer = Timer(timeInterval: 0.16, repeats: true) { [weak self] _ in
+            animationStartedAt = ProcessInfo.processInfo.systemUptime
+            let timer = Timer(timeInterval: mascotKind == .hybridHoodie ? 1/30 : 0.16, repeats: true) { [weak self] _ in
                 guard let self else { return }
+                if let end=self.hybridFinishAt, ProcessInfo.processInfo.systemUptime>=end {
+                    self.hybridFinishAt=nil
+                    self.refreshMascotAnimation()
+                    self.needsDisplay=true
+                    return
+                }
                 let hungryVisible = self.window?.isVisible == true && self.hungryBasinAllowed
                 let strike = self.hungryBasin.advance(requested: self.balanceHungryRequested, allowed: hungryVisible)
                 if self.balanceHungryFrame != nil { self.needsDisplay = true }
@@ -1030,7 +1048,9 @@ final class SubtitleView: NSView {
                 }
                 if !self.balanceHungryRequested && self.hungryBasin.frame == nil { self.refreshMascotAnimation() }
                 if self.screenEdgeDock != nil { self.advanceScreenEdgeFrame(); return }
-                self.sequenceIndex = (self.sequenceIndex + 1) % self.playbackSequence.count
+                if self.mascotKind == .hybridHoodie, let start = self.animationStartedAt {
+                    self.sequenceIndex = Int(max(0,ProcessInfo.processInfo.systemUptime-start)/0.16) % self.playbackSequence.count
+                } else { self.sequenceIndex = (self.sequenceIndex + 1) % self.playbackSequence.count }
                 if (!self.dragReaction.active && self.sleepSample == nil && !self.headPatActive && self.audioMouthIndex == nil && !self.performanceActive && self.strollSample == nil && self.rainShelterPose == nil && self.scootSample == nil && self.frontRetreatSample == nil) { self.needsDisplay = true }
             }
             animationTimer = timer
@@ -1038,6 +1058,7 @@ final class SubtitleView: NSView {
         } else {
             animationTimer?.invalidate(); animationTimer = nil
             hungryBasinSound.stop()
+            animationStartedAt = nil; hybridFinishAt = nil
             sequenceIndex = 0
         }
     }
@@ -1289,7 +1310,8 @@ final class SubtitleView: NSView {
         }
         mascot.drawSeated(frame: pat?.frame ?? (seatedGazeActive || audioMouthIndex == nil ? mascotFrameIndex : 0),
             mouth: audioMouthIndex, in: rect, at: now, motionAmount: seatedMotionAmount(at: now),
-            gaze: pat == nil && seatedGazeActive ? gaze.position : nil, thinking: pat != nil || mascotAnimating)
+            gaze: pat == nil && seatedGazeActive ? gaze.position : nil, thinking: pat != nil || mascotAnimating,
+            thinkingTime: mascotKind == .hybridHoodie && pat == nil ? animationStartedAt.map { now-$0 } : nil)
     }
 }
 

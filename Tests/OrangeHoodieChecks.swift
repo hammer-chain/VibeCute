@@ -1,4 +1,5 @@
 import AppKit
+@testable import CodexCaptions
 
 @main
 struct OrangeHoodieChecks {
@@ -7,6 +8,12 @@ struct OrangeHoodieChecks {
         precondition(CharacterChoice.resolved("blue-fish-orange-hoodie", developerMode: false) == .orangeHoodie)
         precondition(CharacterChoice.orangeHoodie.mascot == .orangeHoodie)
         precondition(CharacterChoice.defaultChoice == .deepseek)
+        precondition(CharacterChoice.selectable(developerMode: true).contains(.hybridHoodie))
+        precondition(!CharacterChoice.selectable(developerMode: false).contains(.hybridHoodie))
+        precondition(CharacterChoice.resolved("blue-fish-claude-hybrid", developerMode: true) == .hybridHoodie)
+        precondition(CharacterChoice.hybridHoodie.mascot == .hybridHoodie)
+        precondition(MascotAnimation.hybridHoodie.hybridArtwork?.poses.count == 8)
+        precondition(MascotAnimation.hybridHoodie.playbackSequence == MascotAnimation.orangeHoodie.playbackSequence)
         let start = ProcessInfo.processInfo.systemUptime
         let artwork = MascotAnimation.orangeHoodie
         let loadMS = (ProcessInfo.processInfo.systemUptime - start) * 1000

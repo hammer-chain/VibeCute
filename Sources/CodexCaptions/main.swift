@@ -21,6 +21,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
             CutoutComparisonController.shared.show()
             return
         }
+        if CommandLine.arguments.contains("--hybrid-hoodie-studio") {
+            NSApp.setActivationPolicy(.regular)
+            HybridHoodieStudioController.shared.show()
+            return
+        }
         if CommandLine.arguments.contains("--cutout-studio") {
             NSApp.setActivationPolicy(.regular)
             CutoutStudioController.shared.show()
@@ -57,6 +62,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSPo
         #if !VIBECUTE_RELEASE
         if CommandLine.arguments.contains("--cutout-compare") {
             DispatchQueue.main.async { CutoutComparisonController.shared.show() }
+        }
+        if CommandLine.arguments.contains("--hybrid-hoodie-workbench") {
+            DispatchQueue.main.async { HybridHoodieStudioController.shared.show() }
         }
         if CommandLine.arguments.contains("--cutout-workbench") {
             DispatchQueue.main.async { CutoutStudioController.shared.show() }

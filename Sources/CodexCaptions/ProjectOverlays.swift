@@ -951,7 +951,7 @@ final class ProjectOverlays {
                 case .doubao: name = "豆包"
                 case .opencode: name = "OpenCode"
                 case .workbuddy: name = "WorkBuddy"
-                case .deepseekCutout, .orangeHoodie: name = "DeepSeek"
+                case .deepseekCutout, .orangeHoodie, .hybridHoodie: name = "DeepSeek"
                 case .companion: name = "独立角色"
                 case .preview: name = "动作预览"
                 }

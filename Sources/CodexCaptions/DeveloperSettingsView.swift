@@ -59,6 +59,7 @@ struct DeveloperSettingsView: View {
                     VStack(alignment: .leading, spacing: 10) {
                         Button("对比 DeepSeek 两版…") { CutoutComparisonController.shared.show() }
                         Button("开启cutout工作台") { CutoutStudioController.shared.show() }
+                        Button("工服混合分层工作台") { HybridHoodieStudioController.shared.show() }
                         HStack {
                             Text("台词间隔")
                             Slider(value: $model.akimboUtterancePause, in: AkimboReaction.utterancePauseRange, step: 0.1)

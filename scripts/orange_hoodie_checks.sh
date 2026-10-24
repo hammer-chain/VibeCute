@@ -4,9 +4,15 @@ cd "$(dirname "$0")/.."
 sdk_path=$(xcrun --show-sdk-path)
 swift build --disable-sandbox -j 4 --product CodexCaptions -Xcxx -isystem -Xcxx "$sdk_path/usr/include/c++/v1"
 bin=$(swift build --show-bin-path)
-swiftc -module-cache-path .build/clang-cache Sources/CodexCaptions/MascotAnimation.swift \
-    Sources/CodexCaptions/CutoutCharacter.swift Sources/CodexCaptions/CutoutRig.swift \
-    Sources/CodexCaptions/ThinkingGazeRegistration.swift \
-    "$bin/CodexCaptions.build/DerivedSources/resource_bundle_accessor.swift" \
-    Tests/OrangeHoodieChecks.swift -o .build/orange-hoodie-checks
+objects=()
+while IFS= read -r file; do
+    [[ "$file" == */CodexCaptions.build/main.swift.o ]] || objects+=("$file")
+done < "$bin/CodexCaptions.product/Objects.LinkFileList"
+swiftc -module-cache-path .build/clang-cache -parse-as-library -I "$bin/Modules" -I Sources/CSQLite -I Sources/ZstdBridge/include \
+    -I Sources/AubioBridge/include \
+    -Xcc "-fmodule-map-file=$bin/ZstdBridge.build/module.modulemap" \
+    -Xcc "-fmodule-map-file=$bin/AubioBridge.build/module.modulemap" \
+    -Xcc "-fmodule-map-file=$bin/BTrackBridge.build/module.modulemap" \
+    -Xcc "-fmodule-map-file=$bin/BeatNetBridge.build/module.modulemap" \
+    Tests/OrangeHoodieChecks.swift "${objects[@]}" -framework Accelerate -lc++ -lsqlite3 -o .build/orange-hoodie-checks
 .build/orange-hoodie-checks "${1:-/tmp/orange-hoodie-render.png}"

@@ -7,8 +7,9 @@ enum CaptionMascot: String, CaseIterable {
     case codex, deepseek, claude, doubao, opencode, workbuddy, companion, preview
     case deepseekCutout = "deepseek-cutout"
     case orangeHoodie = "blue-fish-orange-hoodie"
+    case hybridHoodie = "blue-fish-claude-hybrid"
     var directory: String {
-        if self == .orangeHoodie { return "OrangeHoodieThinking" }
+        if self == .orangeHoodie || self == .hybridHoodie { return "OrangeHoodieThinking" }
         return self == .deepseek ? "DeepSeekThinking" : "CodexThinking"
     }
 }
@@ -18,15 +19,16 @@ enum CharacterChoice: String, CaseIterable, Identifiable {
     case codex, deepseek, pinkBear
     case deepseekCutout = "deepseek-cutout"
     case orangeHoodie = "blue-fish-orange-hoodie"
+    case hybridHoodie = "blue-fish-claude-hybrid"
     // Retired: keep the raw value only for reading existing preferences.
     static let includesPinkBear = false
     static let defaultChoice: Self = .deepseek
     static var available: [Self] { selectable(developerMode: false) }
     static func selectable(developerMode: Bool) -> [Self] {
-        [.deepseek, .orangeHoodie, .codex, .deepseekCutout].filter { $0.isSelectable(developerMode: developerMode) }
+        [.deepseek, .orangeHoodie, .codex, .deepseekCutout, .hybridHoodie].filter { $0.isSelectable(developerMode: developerMode) }
     }
     func isSelectable(developerMode: Bool) -> Bool {
-        (self != .pinkBear || Self.includesPinkBear) && (self != .deepseekCutout || (developerMode && BuildProfile.experiments))
+        (self != .pinkBear || Self.includesPinkBear) && (![Self.deepseekCutout, .hybridHoodie].contains(self) || (developerMode && BuildProfile.experiments))
     }
     static func resolved(_ rawValue: String?, developerMode: Bool) -> Self {
         guard let rawValue, let choice = Self(rawValue: rawValue), choice.isSelectable(developerMode: developerMode) else {
@@ -47,6 +49,7 @@ enum CharacterChoice: String, CaseIterable, Identifiable {
         case .codex: return "ChatGPT龙娘 （试验版）"
         case .deepseek: return "蓝色大肥鱼"
         case .orangeHoodie: return "蓝色大肥鱼 · Claude Code工服（试验版）"
+        case .hybridHoodie: return "Claude Code工服 · 混合分层（试验版）"
         case .deepseekCutout:
             #if VIBECUTE_RELEASE
             return "CutOut（未包含）"
@@ -60,6 +63,7 @@ enum CharacterChoice: String, CaseIterable, Identifiable {
         switch self {
         case .deepseek: return .deepseek
         case .orangeHoodie: return .orangeHoodie
+        case .hybridHoodie: return .hybridHoodie
         case .deepseekCutout: return .deepseekCutout
         default: return .codex
         }
@@ -263,6 +267,14 @@ final class MascotAnimation {
         return try? JSONDecoder().decode(ThinkingGazeRegistration.self, from: data)
     }()
     static let orangeHoodie = MascotAnimation(character: .orangeHoodie)
+    static let hybridHoodie = MascotAnimation(character: .hybridHoodie)
+    private(set) var hybridArtwork: HybridHoodieArtwork?
+    lazy var hybridThinking: HybridHoodieThinking? = {
+        guard let hybridArtwork,
+              let file = Bundle.main.url(forResource:"body-underpainting",withExtension:"png",subdirectory:"OrangeHoodieThinking/Hybrid")
+                ?? Bundle.module.url(forResource:"body-underpainting",withExtension:"png",subdirectory:"OrangeHoodieThinking/Hybrid") else { return nil }
+        return HybridHoodieThinking(artwork:hybridArtwork,resourceRoot:file.deletingLastPathComponent())
+    }()
     static let pinkBear = MascotAnimation(character: .codex, pinkBear: true)
     let isPinkBear: Bool
     var playbackSequence: [Int] { isPinkBear
@@ -276,7 +288,7 @@ final class MascotAnimation {
     private(set) var thinkingFrames: [NSImage] = []
     let mouths: [NSImage]
     let mouthRect: NSRect
-    var supportsSeatedGaze: Bool { (character == .deepseek || character == .orangeHoodie) && !isPinkBear }
+    var supportsSeatedGaze: Bool { (character == .deepseek || character == .orangeHoodie || character == .hybridHoodie) && !isPinkBear }
     private lazy var gazeRegistration: ThinkingGazeRegistration? = {
         if character == .deepseek { return Self.thinkingGazeRegistration }
         let url = Bundle.main.url(forResource: "thinking-gaze", withExtension: "json", subdirectory: character.directory)
@@ -319,7 +331,7 @@ final class MascotAnimation {
         mouthRect = NSRect(x: targetTop.x, y: 512 - targetTop.y - 25,
                            width: mouthSize.width, height: mouthSize.height)
         // Shared face-only crops never include clothing or the headband.
-        let lipDirectory = character == .orangeHoodie ? "DeepSeekThinking" : directory
+        let lipDirectory = [CaptionMascot.orangeHoodie, .hybridHoodie].contains(character) ? "DeepSeekThinking" : directory
         let lipURL = Bundle.main.url(forResource: "speaking-v2-atlas", withExtension: "png", subdirectory: lipDirectory)
             ?? Bundle.module.url(forResource: "speaking-v2-atlas", withExtension: "png", subdirectory: lipDirectory)
         if let lipURL, let source = NSImage(contentsOf: lipURL),
@@ -346,9 +358,14 @@ final class MascotAnimation {
                 y: (index / 4) * height, width: width, height: height)) else { return nil }
             return NSImage(cgImage: frame, size: NSSize(width: width, height: height))
         }
-        frames = candidates
+        if character == .hybridHoodie {
+            let artwork = HybridHoodieArtwork(frames: candidates)
+            hybridArtwork = artwork
+            // Share the assembled frames; do not retain a second decoded atlas.
+            frames = artwork.poses.map { $0.composite }
+        } else { frames = candidates }
         if supportsSeatedGaze {
-            thinkingFrames = candidates
+            thinkingFrames = frames
             _ = thinkingGazeArtwork
         }
     }
@@ -368,26 +385,35 @@ final class MascotAnimation {
 
     func drawSeated(frame: Int = 0, mouth: Int?, in rect: NSRect,
                     at time: TimeInterval, motionAmount: CGFloat = 1, gaze: NSPoint? = nil,
-                    thinking: Bool = false, gazePupilsVisible: Bool = true) {
+                    thinking: Bool = false, gazePupilsVisible: Bool = true, thinkingTime: Double? = nil) {
         guard frames.indices.contains(frame) else { return }
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSGraphicsContext.current?.cgContext.concatenate(seatedTransform(in: rect, at: time, amount: motionAmount))
+        if thinking, mouth == nil, let thinkingTime, let hybridThinking {
+            hybridThinking.draw(at:thinkingTime,in:rect)
+            return
+        }
         if thinking, mouth == nil, thinkingFrames.indices.contains(frame) {
-            thinkingFrames[frame].draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            drawPose(frame, in: rect)
             if let gaze { thinkingGazeArtwork?.draw(frame: frame, gaze: gaze, in: rect, pupilsVisible: gazePupilsVisible) }
             return
         }
         if let gaze, frame != 3, frame != 4, let artwork = gazeArtwork, artwork.available {
             // A single confirmed body; only the eye layers blink or look around.
-            frames[0].draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            drawPose(0, in: rect)
             artwork.draw(gaze: gaze, in: rect)
         } else {
             // A blink replaces the complete cached eye regions. Clipping it
             // to the open-eye aperture leaves the old iris/lash around its edge.
-            frames[frame].draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
+            drawPose(frame, in: rect)
         }
         if let mouth { drawMouth(mouth, in: rect) }
+    }
+
+    private func drawPose(_ frame: Int, in rect: NSRect) {
+        if let hybridArtwork { hybridArtwork.draw(frame: frame, in: rect) }
+        else { frames[frame].draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1) }
     }
 
     func drawMouth(_ index: Int, in characterRect: NSRect, anchor: NSRect? = nil) {
