@@ -42,6 +42,7 @@ final class AppModel: ObservableObject {
     var rainWeatherDiagnostics: [String: Any] { rainWeather.diagnostics }
     var rainShelterDiagnostics: [String: Any] { rainShelter.diagnostics }
     private lazy var rainShelter = RainShelterCoordinator(overlays:overlays)
+    private lazy var crabPet = CrabPetCoordinator(overlays:overlays)
 
     func searchRainCity(_ query: String) {
         rainCitySearch?.cancel(); rainCityResults = []
@@ -118,6 +119,7 @@ final class AppModel: ObservableObject {
     private var demoCharacterOverride: CharacterChoice?
     private var hidePreviewCaption = false
     private var hungryBasinPreview = false
+    private var crabPetPreview = false
     private var isolatedActionPreview: Bool { demoMode && demoCharacterOverride != nil }
     private var demoMascot: CaptionMascot {
         guard isolatedActionPreview else { return demoDeepSeek ? .deepseek : .codex }
@@ -136,9 +138,19 @@ final class AppModel: ObservableObject {
         }
         requestedPreviewCharacter = developerPreviewCharacter
         hungryBasinPreview = false
+        crabPetPreview = false; crabPet.stop()
         defer { requestedPreviewCharacter = nil }
         switch action {
         case .thinking: showDemo(deepSeek:true)
+        case .crabPet:
+            guard harnessStateObserved else {
+                developerPreviewStatus = "正在确认绑定的 Harness 是否空闲"; return
+            }
+            guard harnessIdle(for: .orangeHoodie) else {
+                developerPreviewStatus = "绑定的 Harness 正在工作 · 空闲后才能互动"; return
+            }
+            showDemo(deepSeek:true,showCaption:false)
+            crabPet.preparePreview(); crabPetPreview = true; previewUntil = Date().addingTimeInterval(60); redraw()
         case .hungryBasin:
             showDemo(deepSeek:true)
             hungryBasinPreview = true; hidePreviewCaption = true; redraw()
@@ -309,6 +321,7 @@ final class AppModel: ObservableObject {
         redraw(); updateMouth()
     }
     func stopPreview() {
+        crabPetPreview = false; crabPet.stop()
         hungryBasinPreview = false
         let restoreEnabled = questionPreviewPreviousEnabled
         questionPreviewActive = false; questionPreviewRequest = nil; questionPreviewRevealAt = nil
@@ -522,9 +535,27 @@ final class AppModel: ObservableObject {
     private var harnessStateObserved = false
     private var pendingWindowPeekPreview = false
     private var pendingWindowSeatPreview = false
-    private var deepSeekHarnessIdle: Bool {
-        !sessions.contains { tracks($0.source) && characterChoice(for: $0.source) == .deepseek &&
-            ($0.active || $0.runningSubagentCount > 0 || !$0.readable) }
+    /// Every tracked Harness sharing this character must be idle, including
+    /// sessions outside the selected caption and requests delivered by bridges.
+    func harnessIdle(for character: CharacterChoice) -> Bool {
+        func bound(_ source: SessionSource) -> Bool {
+            tracks(source) && characterChoice(for: source) == character
+        }
+        return !sessions.contains { bound($0.source) &&
+            ($0.active || $0.runningSubagentCount > 0 || !$0.readable || !$0.pendingQuestions.isEmpty) }
+            && !(bound(.codex) && !pendingApprovals.isEmpty)
+            && !(bound(.zcode) && !zcodeHookBridge.items.isEmpty)
+    }
+    private var deepSeekHarnessIdle: Bool { harnessIdle(for: .deepseek) }
+
+    private func interruptIdleInteractionsForWork() {
+        if !harnessIdle(for: .orangeHoodie) { crabPet.stop() }
+        guard !deepSeekHarnessIdle else { return }
+        windowPeekIdle.reset()
+        if automaticSleep { stopSleepDemo() }
+        if windowPeek.isRunning {
+            windowPeek.stop(reason:"绑定的 Harness 已开始工作 · 恢复工作展示", immediate:true)
+        }
     }
     @Published var autoWindowPeekEnabled: Bool { didSet {
         save("autoWindowPeekEnabled",autoWindowPeekEnabled); windowPeekIdle.reset()
@@ -611,6 +642,7 @@ final class AppModel: ObservableObject {
         ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/ipc/ipc.sock").path) { [weak self] requests in
             guard let self else { return }
             self.pendingApprovals = requests
+            self.interruptIdleInteractionsForWork()
             self.pruneQuestionNotifications()
             self.redraw()
         }
@@ -803,7 +835,7 @@ final class AppModel: ObservableObject {
 
     func start() {
         rainStarted = true
-        desktopRain.onSuspension = { [weak self] in self?.rainShelter.stopAll() }
+        desktopRain.onSuspension = { [weak self] in self?.rainShelter.stopAll(); self?.crabPet.stop() }
         desktopRain.footprintProvider = { [weak self] in self?.overlays.weatherFootprints ?? [] }
         desktopRain.basinProvider = { [weak self] in self?.rainShelter.basinSurfaces ?? [] }
         desktopRain.onBasinImpact = { [weak self] impact,now in self?.rainShelter.receiveBasinImpact(impact,at:now) }
@@ -1032,6 +1064,7 @@ final class AppModel: ObservableObject {
                 for item in self.zcodeHookBridge.items where !visible.contains(item.sessionID) {
                     self.zcodeHookBridge.handoff(item.request.id)
                 }
+                self.interruptIdleInteractionsForWork()
                 self.pruneQuestionNotifications(); self.redraw()
             }
             zcodeHookBridge.start()
@@ -1457,6 +1490,7 @@ final class AppModel: ObservableObject {
     }
 
     private func updateBackdropAvoidance() {
+        guard !crabPet.running else { return }
         let now = ProcessInfo.processInfo.systemUptime
         let source = backdropSource
         guard !rainShelter.sources.contains(source) else { return }
@@ -2025,15 +2059,9 @@ final class AppModel: ObservableObject {
         pruneQuestionNotifications()
         errorText = error
         harnessStateObserved = true
-        if !deepSeekHarnessIdle {
-            // Work takes priority over automatic rest, even before its first caption.
-            // Explicit sleep previews retain their own stop/cancel lifecycle.
-            windowPeekIdle.reset()
-            if automaticSleep { stopSleepDemo() }
-            if windowPeek.isRunning {
-                windowPeek.stop(reason:"绑定的 Harness 已开始工作 · 恢复工作展示", immediate:true)
-            }
-        }
+        // Invalidate in-flight idle discovery before it can start an interaction.
+        // Explicit sleep previews retain their own stop/cancel lifecycle.
+        interruptIdleInteractionsForWork()
         if pendingWindowPeekPreview {
             let previewSeat = pendingWindowSeatPreview
             pendingWindowPeekPreview = false
@@ -2378,7 +2406,7 @@ final class AppModel: ObservableObject {
         onOnboardingLayout?()
         if let url = diagnosticsURL {
             let value: [String: Any] = ["visible": visible, "text": currentText, "kind": kind,
-                "desktopRain": desktopRain.diagnostics, "rainWeather": rainWeather.diagnostics, "rainShelter": rainShelter.diagnostics,
+                "crabPet": crabPet.diagnostics, "desktopRain": desktopRain.diagnostics, "rainWeather": rainWeather.diagnostics, "rainShelter": rainShelter.diagnostics,
                 "title": title,
                 "header": header,
                 "source": selected?.source.rawValue ?? "",
@@ -2608,6 +2636,9 @@ final class AppModel: ObservableObject {
     private func updateMouth() {
         let now = ProcessInfo.processInfo.systemUptime
         overlays.updateDragReactions(at: now)
+        crabPet.update(enabled: enabled && !onboardingActive && (!demoMode || crabPetPreview) && !backdropRelocation.running &&
+            !windowPeek.isRunning && sleepDemoStartedAt == nil,
+            idle:harnessStateObserved && harnessIdle(for: .orangeHoodie),preview:crabPetPreview,at:now)
         let rainSnapshot = desktopRain.shelterSnapshot
         if rainSnapshot.raining, !demoMode, enabled {
             if automaticSleep { wakeAutomaticSleep(at:now) }

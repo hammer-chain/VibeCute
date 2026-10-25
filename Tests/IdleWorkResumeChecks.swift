@@ -80,6 +80,45 @@ import CaptionCore
                         focusedID:"", characterBindings:[.claude:.deepseek])
         precondition(overlays.characterDiagnostics.isEmpty, "Auto-hidden character must stop after work ends")
         let model = AppModel()
+        let bindings = model.characterBindings
+        let tracked = model.trackedHarnesses
+        let question = UserQuestionRequest.parse(id:"idle-question", turnID:nil, asynchronous:true,
+            questions:[["title":"等待选择", "options":["继续"]]], date:Date())!
+        for source in SessionSource.allCases {
+            model.trackedHarnesses = [source.preferenceID]
+            for choice in [CharacterChoice.deepseek, .orangeHoodie] {
+                model.characterBindings = [source.preferenceID:choice.rawValue]
+                var session = SessionSnapshot(path:"/fixture", id:"busy", active:true, activity:.distantPast)
+                session.source = source
+                model.sessions = [session]
+                precondition(!model.harnessIdle(for:choice), "All bound tasks block rest, even without recent captions: \(source)")
+                session.active = false; session.runningSubagentCount = 1; model.sessions = [session]
+                precondition(!model.harnessIdle(for:choice), "Running subagents block rest")
+                session.runningSubagentCount = 0; session.pendingQuestions = [question]; model.sessions = [session]
+                precondition(!model.harnessIdle(for:choice), "Waiting for an answer is still a task")
+                session.pendingQuestions[0].externalApproval = true; model.sessions = [session]
+                precondition(!model.harnessIdle(for:choice), "Waiting for approval is still a task")
+                session.pendingQuestions = []; session.readable = false; model.sessions = [session]
+                precondition(!model.harnessIdle(for:choice), "Unreadable state must not be treated as idle")
+                session.readable = true; model.sessions = [session]
+                precondition(model.harnessIdle(for:choice), "A completed task permits rest")
+                session.active = true; model.sessions = [session]
+                let other: CharacterChoice = choice == .deepseek ? .orangeHoodie : .deepseek
+                precondition(model.harnessIdle(for:other), "Work only blocks the bound character")
+            }
+        }
+        model.trackedHarnesses = ["codex", "claude"]
+        model.characterBindings = ["codex":CharacterChoice.orangeHoodie.rawValue, "claude":CharacterChoice.orangeHoodie.rawValue]
+        var background = SessionSnapshot(path:"/fixture/background", id:"background", active:true)
+        background.source = .claude
+        model.sessions = [SessionSnapshot(path:"/fixture/complete", id:"complete"), background]
+        precondition(!model.harnessIdle(for:.orangeHoodie), "Any busy Harness sharing the character blocks idle interaction")
+        model.trackedHarnesses = ["codex"]
+        model.sessions = [background]
+        precondition(model.harnessIdle(for:.orangeHoodie), "Untracked Harnesses must not block another character")
+        model.sessions = []
+        model.trackedHarnesses = tracked
+        model.characterBindings = bindings
         func fish() -> [String:Any]? { model.developerPreviewCharacters.first { ($0["artwork"] as? String) == "deepseek" } }
         func wait(_ label: String, _ predicate: () -> Bool) {
             let deadline = Date().addingTimeInterval(12)
@@ -110,6 +149,10 @@ import CaptionCore
         precondition(!model.demoMode)
         model.autoHide = true
         wait("Working character remains visible with auto hide") { fish()?["animating"] as? Bool == true }
-        print("PASS: automatic sleep interrupted by captionless work; no resleep while active; completion resets idle; window rest releases original character; auto-hide retains working animation")
+        model.bind(.orangeHoodie, to:.claude)
+        model.developerPreviewCharacter = .orangeHoodie
+        model.previewAction(.crabPet)
+        precondition(!model.demoMode && model.developerPreviewStatus.contains("正在工作"), "Crab preview must not bypass a bound task")
+        print("PASS: 7 Harnesses x 2 characters block active/subagent/question/approval/unreadable tasks; shared bindings and untracked isolation; crab preview cannot bypass work; automatic sleep interrupted by captionless work; no resleep while active; completion resets idle; window rest releases original character; manual edge hiding preserved; auto-hide retains working animation")
     }
 }

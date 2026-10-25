@@ -297,6 +297,15 @@ final class SubtitleView: NSView {
     private var rainShelterThinking = false
     private var balanceHungryRequested = false
     private var hungryBasin = HungryBasinMotion()
+    private(set) var crabPetPose: CrabPetPose?
+    var crabPetEligible: Bool {
+        mascotKind == .orangeHoodie && screenEdgeDock == nil && !dragReaction.active &&
+        !headPatActive && !performanceActive && sleepSample == nil && hoodieScootPose == nil
+    }
+    func setCrabPetPose(_ pose: CrabPetPose?) {
+        guard crabPetPose != pose else { return }
+        crabPetPose = pose; needsDisplay = true
+    }
     let hungryBasinSound = HungryBasinSound()
     var balanceHungryFrame: Int? { hungryBasinAllowed ? hungryBasin.frame : nil }
     private var hungryBasinAllowed: Bool {
@@ -919,7 +928,7 @@ final class SubtitleView: NSView {
     #endif
         if mode == .character {
             if mascotKind == .deepseek && !usesPinkBear { return 204 * layoutScale }
-            if mascotKind == .hybridHoodie { return 220 * layoutScale }
+            if mascotKind == .orangeHoodie || mascotKind == .hybridHoodie { return 220 * layoutScale }
             return (performanceHeadroom > 0 ? 147 : 126) * layoutScale
         }
         let key = TextMeasureKey(text: text + (reservesWorkingDots ? " ..." : ""), fontSize: fontSize, scale: layoutScale, width: 0)
@@ -1020,6 +1029,7 @@ final class SubtitleView: NSView {
         if usesPinkBear || kind != .deepseek { hungryBasinSound.stop(); balanceHungryRequested = false; hungryBasin = HungryBasinMotion(); rainShelterThinking = false; rainShelterPose = nil; strollSample = nil; strollEntryImage = nil; scootSample = nil; frontRetreatSample = nil; frontRetreatEntryImage = nil }
         if usesPinkBear { audioMouthIndex = nil; performanceFrameIndex = nil }
         if kind == .orangeHoodie { performanceFrameIndex = nil; dragReaction.reset() }
+        if kind != .orangeHoodie { crabPetPose = nil }
         refreshGazeTracking()
         refreshSeatedMotion()
         refreshMascotAnimation()
@@ -1196,6 +1206,10 @@ final class SubtitleView: NSView {
         NSGraphicsContext.current?.cgContext.concatenate(dragReaction.transform(in: seatedSpriteRect, scale: layoutScale))
         if dragReaction.active, let frame = dragReaction.frameIndex, CharacterDragArtwork.shared.available {
             CharacterDragArtwork.shared.draw(frame:frame,in:seatedSpriteRect)
+            return
+        }
+        if let pose = crabPetPose, mascotKind == .orangeHoodie, screenEdgeDock == nil {
+            CrabPetArtwork.shared.draw(pose,in:bounds,scale:layoutScale)
             return
         }
         if let pose = rainShelterPose {

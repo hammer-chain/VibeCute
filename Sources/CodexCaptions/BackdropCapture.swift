@@ -22,7 +22,7 @@ final class BackdropCapture: NSObject, SCStreamOutput, SCStreamDelegate {
     private let imageContext = CIContext(options:[.cacheIntermediates:false])
     private var fallbackTimeout: DispatchWorkItem?
 
-    func capture(displayID: CGDirectDisplayID) async throws -> CGImage {
+    func capture(displayID: CGDirectDisplayID, maximumDimension: Int? = nil) async throws -> CGImage {
         // Let the capture API enforce access. A legacy preflight result alone must not block SCK.
         let content: SCShareableContent
         do { content = try await SCShareableContent.excludingDesktopWindows(false,onScreenWindowsOnly:true) }
@@ -30,7 +30,7 @@ final class BackdropCapture: NSObject, SCStreamOutput, SCStreamDelegate {
             if Self.isPermissionFailure(error) { throw Failure.permission }
             throw error
         }
-        return try await capture(displayID:displayID,content:content)
+        return try await capture(displayID:displayID,content:content,maximumDimension:maximumDimension)
     }
     // Discover shareable content once per observation, rather than once per display.
     func capture(displayIDs: [CGDirectDisplayID]) async throws -> [CGImage] {
@@ -39,13 +39,17 @@ final class BackdropCapture: NSObject, SCStreamOutput, SCStreamDelegate {
         for id in displayIDs { images.append(try await capture(displayID:id,content:content)) }
         return images
     }
-    private func capture(displayID: CGDirectDisplayID, content: SCShareableContent) async throws -> CGImage {
+    private func capture(displayID: CGDirectDisplayID, content: SCShareableContent, maximumDimension: Int? = nil) async throws -> CGImage {
         guard let display = content.displays.first(where: { $0.displayID == displayID }) else { throw Failure.display }
         let ownPID = ProcessInfo.processInfo.processIdentifier
         let ownApps = content.applications.filter { $0.processID == ownPID }
         let filter = SCContentFilter(display:display,excludingApplications:ownApps,exceptingWindows:[])
         let config = SCStreamConfiguration()
         config.width = display.width; config.height = display.height
+        if let maximumDimension {
+            let ratio=min(1,Double(max(64,maximumDimension))/Double(max(display.width,display.height)))
+            config.width=max(1,Int(Double(display.width)*ratio)); config.height=max(1,Int(Double(display.height)*ratio))
+        }
         config.pixelFormat = kCVPixelFormatType_32BGRA
         config.showsCursor = false; config.capturesAudio = false
         config.queueDepth = 3

@@ -211,6 +211,13 @@ private final class CharacterOverlayGroup {
         character.subtitle.setRainShelterPose(sample.frame.map { RainShelterPose(frame:$0,mirrored:sample.mirrored) })
         character.subtitle.setRainShelterThinking(sample.phase == .sheltered)
     }
+    func applyCrabPet(_ sample: CrabPetSample) {
+        guard relocating, !relocationInterrupted else { return }
+        movingGroup = true; character.panel.setFrameOrigin(sample.origin); movingGroup = false
+        expectedRelocationOrigin = character.panel.frame.origin
+        lastCharacterFrame = character.panel.frame
+        character.subtitle.setCrabPetPose(sample.pose)
+    }
     func saveRainShelterPosition() { savePosition(allowRelocation:true) }
 
     func endRelocation() {
@@ -1053,6 +1060,8 @@ final class ProjectOverlays {
         groups[groupKey(for:source)]?.relocationInterrupted ?? true
     }
     func beginBackdropRelocation(for source: CaptionMascot) { groups[groupKey(for:source)]?.beginRelocation() }
+    func applyCrabPet(_ sample: CrabPetSample, for source: CaptionMascot) { groups[groupKey(for:source)]?.applyCrabPet(sample) }
+    func clearCrabPet(for source: CaptionMascot) { character(for:source)?.subtitle.setCrabPetPose(nil) }
     func applyBackdropRelocation(_ sample: BackdropRelocationSample, for source: CaptionMascot) {
         groups[groupKey(for:source)]?.applyRelocation(sample)
     }
