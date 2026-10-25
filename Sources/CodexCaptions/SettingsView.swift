@@ -157,6 +157,7 @@ struct SettingsView: View {
           case .deepseek: model.chooseHarnessDirectory()
           case .claude: model.chooseClaudeDirectory()
           case .opencode: model.chooseOpenCodeDirectory()
+          case .zcode: model.chooseZcodeDirectory()
           case .workbuddy: model.chooseWorkBuddyDirectory()
           case .doubao: model.openDoubaoAccessibilitySettings()
           }
@@ -164,6 +165,16 @@ struct SettingsView: View {
       }
       Text(model.directoryPath(for: source)).font(.caption).foregroundStyle(.secondary)
         .lineLimit(1).truncationMode(.middle).textSelection(.enabled)
+      if source == .zcode {
+        HStack {
+          Button(model.zcodeHookStatus == "已接入新会话" ? "修复提问与审批" : "接入提问与审批") {
+            model.installZcodeHook()
+          }.buttonStyle(.link).disabled(!model.tracks(.zcode))
+          if !model.zcodeHookStatus.isEmpty {
+            Text(model.zcodeHookStatus).font(.caption).foregroundStyle(.secondary)
+          }
+        }
+      }
       Picker(
         "角色",
         selection: HarnessSettingsBindings(model: model).character(source)

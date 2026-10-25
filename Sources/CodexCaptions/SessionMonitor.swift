@@ -116,7 +116,7 @@ final class SessionRecord {
             case .codex: events = EventParser.parse(line, includeResponseMetrics: true)
             case .deepseek: events = harness.parse(line)
             case .claude: events = claude.parse(line)
-            case .doubao, .opencode, .workbuddy: events = []
+            case .doubao, .opencode, .zcode, .workbuddy: events = []
             }
             if source == .deepseek {
                 isSubagent = harness.isSubagent; parentSessionID = harness.parentSessionID
@@ -157,13 +157,15 @@ final class SessionMonitor {
     private let visibleReader: (() -> ([SessionSnapshot], String?))?
     private let openCode: OpenCodeReader?
     private var openCodeSnapshots: [SessionSnapshot] = []
+    private let zcode: OpenCodeReader?
+    private var zcodeSnapshots: [SessionSnapshot] = []
     private let workBuddy: WorkBuddyReader?
     private var scanErrors: [String] = []
     private let connectedAt = Date()
     var onChange: (([SessionSnapshot], String?) -> Void)?
     var onOutcomes: (([SessionOutcomeNotice]) -> Void)?
 
-    init(root: URL, harnessRoot: URL?, claudeRoot: URL? = nil, openCodeRoot: URL? = nil, workBuddyRoot: URL? = nil,
+    init(root: URL, harnessRoot: URL?, claudeRoot: URL? = nil, openCodeRoot: URL? = nil, zcodeRoot: URL? = nil, workBuddyRoot: URL? = nil,
          enabledSources: Set<SessionSource> = Set(SessionSource.allCases),
          visibleReader: (() -> ([SessionSnapshot], String?))? = nil) {
         self.visibleReader = enabledSources.contains(.doubao) ? visibleReader : nil
@@ -173,6 +175,9 @@ final class SessionMonitor {
         openCode = enabledSources.contains(.opencode) ? openCodeRoot.map {
             OpenCodeReader(url: $0.appendingPathComponent("opencode.db"))
         } : nil
+        zcode = enabledSources.contains(.zcode) ? zcodeRoot.map {
+            OpenCodeReader(url: $0.appendingPathComponent("cli/db/db.sqlite"), source: .zcode)
+        } : nil
         workBuddy = enabledSources.contains(.workbuddy) ? workBuddyRoot.map { WorkBuddyReader(root: $0) } : nil
         titleIndex = SessionTitleIndex(url: root.deletingLastPathComponent().appendingPathComponent("session_index.jsonl"))
         projectIndex = SessionProjectIndex(url: root.deletingLastPathComponent().appendingPathComponent(".codex-global-state.json"))
@@ -180,7 +185,7 @@ final class SessionMonitor {
 
     func pin(_ path: String?) { queue.async { self.pinned = path; self.lastScan = .distantPast } }
     func start() {
-        guard !roots.isEmpty || openCode != nil || workBuddy != nil || visibleReader != nil else { return }
+        guard !roots.isEmpty || openCode != nil || zcode != nil || workBuddy != nil || visibleReader != nil else { return }
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(deadline: .now(), repeating: .milliseconds(700), leeway: .milliseconds(100))
         timer.setEventHandler { [weak self] in autoreleasepool { self?.poll() } }
@@ -213,6 +218,13 @@ final class SessionMonitor {
                 databaseErrors.append(error.localizedDescription)
             }
         }
+        if let zcode {
+            do { zcodeSnapshots = try zcode.poll(pinned: pinned, now: now) }
+            catch {
+                zcodeSnapshots = []
+                databaseErrors.append(error.localizedDescription)
+            }
+        }
         let parents = records.values.filter { !$0.isSubagent && !$0.snapshot.id.isEmpty }
         for parent in parents {
             let children = records.values.filter {
@@ -242,6 +254,7 @@ final class SessionMonitor {
         }
         snapshots += visible.0.prefix(1)
         snapshots += openCodeSnapshots.prefix(16)
+        snapshots += zcodeSnapshots.prefix(16)
         if let workBuddy {
             do {
                 let values = try workBuddy.poll(pinned: pinned, now: now)
@@ -253,6 +266,8 @@ final class SessionMonitor {
         // A pinned older OpenCode conversation must remain selectable.
         if let pinned, !snapshots.contains(where: { $0.path == pinned }),
            let snapshot = openCodeSnapshots.first(where: { $0.path == pinned }) { snapshots.append(snapshot) }
+        if let pinned, !snapshots.contains(where: { $0.path == pinned }),
+           let snapshot = zcodeSnapshots.first(where: { $0.path == pinned }) { snapshots.append(snapshot) }
         snapshots.sort { $0.activity > $1.activity }
         var errors = scanErrors
         errors += databaseErrors

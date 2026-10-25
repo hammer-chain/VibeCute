@@ -534,7 +534,7 @@ private final class CharacterOverlayGroup {
             character.onMetricsHover = metrics.onHover
             character.setHoverMetrics(speed: metrics.averageSpeed, quota: metrics.quotaText,
                                       showSpeedPlaceholder: source != "companion" && CaptionMascot(rawValue: source) != nil,
-                                      refreshing: metrics.refreshing, forceVisible: fallbackMetrics?.persistent ?? false, name: ["codex": "Codex", "deepseek": "DSH", "workbuddy": "WorkBuddy", "claude": "Claude", "doubao": "豆包", "opencode": "OpenCode"][source] ?? source)
+                                      refreshing: metrics.refreshing, forceVisible: fallbackMetrics?.persistent ?? false, name: ["codex": "Codex", "deepseek": "DSH", "workbuddy": "WorkBuddy", "claude": "Claude", "doubao": "豆包", "opencode": "OpenCode", "zcode": "zcode"][source] ?? source)
         }
         if edgeActive { return }
         if sorted.isEmpty {
@@ -770,7 +770,7 @@ final class ProjectOverlays {
         if let visible = groups.keys.sorted().compactMap({ groups[$0] }).first(where: { $0.character.panel.isVisible }) {
             return visible.character
         }
-        return groups["codex"]?.character ?? groups["deepseek"]?.character ?? groups["claude"]?.character ?? groups["doubao"]?.character ?? groups["opencode"]?.character ?? groups["workbuddy"]?.character ?? fallbackCharacter
+        return groups["codex"]?.character ?? groups["deepseek"]?.character ?? groups["claude"]?.character ?? groups["doubao"]?.character ?? groups["opencode"]?.character ?? groups["zcode"]?.character ?? groups["workbuddy"]?.character ?? fallbackCharacter
     }
 
     private var resolvedBindings: [CaptionMascot: CharacterChoice] = [.codex: .codex, .deepseek: .deepseek]
@@ -950,6 +950,7 @@ final class ProjectOverlays {
                 case .claude: name = "Claude Code"
                 case .doubao: name = "豆包"
                 case .opencode: name = "OpenCode"
+                case .zcode: name = "zcode"
                 case .workbuddy: name = "WorkBuddy"
                 case .deepseekCutout, .orangeHoodie, .hybridHoodie: name = "DeepSeek"
                 case .companion: name = "独立角色"

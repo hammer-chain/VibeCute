@@ -12,6 +12,9 @@ public struct ApprovalContent: Equatable, Sendable {
     public let title: String
     public let reason: String
     public let details: String
+    public init(title: String, reason: String, details: String) {
+        self.title = title; self.reason = reason; self.details = details
+    }
 }
 
 public struct UserQuestionRequest: Equatable, Sendable {
@@ -22,14 +25,15 @@ public struct UserQuestionRequest: Equatable, Sendable {
     public let date: Date
     public var externalApproval: Bool = false
     public var externalQuestion: Bool = false
-    public var applicationName: String { externalApproval || externalQuestion ? "DSH" : "Codex" }
+    public var externalZCode: Bool = false
+    public var applicationName: String { externalZCode ? "zcode" : externalApproval || externalQuestion ? "DSH" : "Codex" }
     public var approval: Bool = false
     public var approvalContent: ApprovalContent? = nil
 
     /// Accept only the two question tools, never arbitrary tool arguments.
     public static func parse(id: String, turnID: String?, asynchronous: Bool,
                              questions rows: [[String: Any]], date: Date) -> Self? {
-        guard !id.isEmpty, (1...3).contains(rows.count) else { return nil }
+        guard !id.isEmpty, (1...4).contains(rows.count) else { return nil }
         var questions: [UserQuestion] = []
         for (index, row) in rows.enumerated() {
             guard let title = row[asynchronous ? "title" : "question"] as? String,

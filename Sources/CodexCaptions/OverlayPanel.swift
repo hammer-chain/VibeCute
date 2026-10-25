@@ -1776,6 +1776,7 @@ final class OverlayController {
         case "DeepSeek Harness": hint = "打开 DeepSeek Harness 窗口"
         case "Claude Code": hint = "跳转到 Claude Code 终端：" + subtitle.conversationTitle
         case "OpenCode": hint = "跳转到 OpenCode 终端：" + subtitle.conversationTitle
+        case "zcode": hint = "打开 zcode 窗口"
         case "WorkBuddy": hint = "打开 WorkBuddy 对话：" + subtitle.conversationTitle
         case "豆包工作": hint = "打开豆包工作窗口：" + subtitle.conversationTitle
         default: hint = "打开 Codex 对话：" + subtitle.conversationTitle
@@ -1881,7 +1882,8 @@ final class OverlayController {
         subtitle.context = context; subtitle.isLive = live
         subtitle.conversationSourceName = context.hasPrefix("DeepSeek Harness") || context.hasPrefix("DSH  ·") ? "DeepSeek Harness"
             : context.hasPrefix("Claude Code") ? "Claude Code" : context.hasPrefix("OpenCode") ? "OpenCode"
-            : context.hasPrefix("WorkBuddy") ? "WorkBuddy" : context.hasPrefix("豆包工作") ? "豆包工作" : "Codex"
+            : context.hasPrefix("zcode") ? "zcode" : context.hasPrefix("WorkBuddy") ? "WorkBuddy"
+            : context.hasPrefix("豆包工作") ? "豆包工作" : "Codex"
         subtitle.mode = mode
         subtitle.setTaskAppearance(needsInput: question != nil, completed: completed, surface: panel.contentView)
         panel.tracksCharacterDrag = mode == .character

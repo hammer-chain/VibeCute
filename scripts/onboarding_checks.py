@@ -30,7 +30,7 @@ command+=['-framework','Accelerate','-lc++','-lsqlite3']+objects
 subprocess.run(command,cwd=root,env=env,check=True)
 def run(suite,extra=()):
     subprocess.run([str(out/'OnboardingChecks'),'--preferences-suite',suite,
-        '--no-position-memory','--no-approval-stream','--no-task-sounds','--no-question-sounds','--no-doubao','--no-workbuddy',
+        '--no-position-memory','--no-approval-stream','--no-task-sounds','--no-question-sounds','--no-doubao','--no-workbuddy', '--no-zcode',
         '--no-audio','--no-avoidance','--sessions-root',str(empty),*extra],cwd=root,env=env,check=True)
 run('app.vibecute.onboarding-check.'+uuid.uuid4().hex)
 for replay in [False,True]:

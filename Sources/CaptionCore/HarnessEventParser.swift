@@ -6,6 +6,7 @@ public enum SessionSource: String, CaseIterable, Sendable {
     case claude = "Claude Code"
     case doubao = "豆包工作"
     case opencode = "OpenCode"
+    case zcode = "zcode"
     case workbuddy = "WorkBuddy"
 
     /// Stable preference key, independent of the display name.
@@ -16,6 +17,7 @@ public enum SessionSource: String, CaseIterable, Sendable {
         case .claude: return "claude"
         case .doubao: return "doubao"
         case .opencode: return "opencode"
+        case .zcode: return "zcode"
         case .workbuddy: return "workbuddy"
         }
     }

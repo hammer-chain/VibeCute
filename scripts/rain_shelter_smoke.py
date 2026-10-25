@@ -88,7 +88,7 @@ try:
         try:
             command = [str(APP), '--preferences-suite', suite, '--no-approval-stream',
                 '--no-audio', '--no-speech', '--no-vocal-separation', '--no-task-sounds', '--no-question-sounds',
-                '--no-doubao', '--no-workbuddy', '--diagnostics', str(diag)]
+                '--no-doubao', '--no-workbuddy', '--no-zcode', '--diagnostics', str(diag)]
             for flag in ['--sessions-root', '--deepseek-root', '--claude-root', '--opencode-root', '--workbuddy-root']:
                 command += [flag, str(EMPTY)]
             with (OUT / (label + '-runtime.log')).open('w') as stream:

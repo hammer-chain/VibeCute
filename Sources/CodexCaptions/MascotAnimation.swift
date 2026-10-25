@@ -4,7 +4,7 @@ import CaptionCore
 enum CaptionMascot: String, CaseIterable {
     // Legacy type also keys source-owned windows. OpenCode selects existing
     // artwork through CharacterChoice, with its own position and caption lane.
-    case codex, deepseek, claude, doubao, opencode, workbuddy, companion, preview
+    case codex, deepseek, claude, doubao, opencode, zcode, workbuddy, companion, preview
     case deepseekCutout = "deepseek-cutout"
     case orangeHoodie = "blue-fish-orange-hoodie"
     case hybridHoodie = "blue-fish-claude-hybrid"

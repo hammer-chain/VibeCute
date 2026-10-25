@@ -155,7 +155,12 @@ public struct SessionSnapshot: Equatable, Sendable {
         }
     }
     public func displayCaption(showAnswers: Bool, showTools: Bool = true) -> Caption? {
-        let caption = !showTools && self.caption?.kind == .tool ? lastNonToolCaption : self.caption
+        // zcode appends a tool part milliseconds after visible assistant text
+        // in the same response. The tool otherwise replaces every message
+        // before the subtitle has a chance to show it.
+        let preferAssistant = source == .zcode && lastNonToolCaption != nil
+        let caption = (!showTools || preferAssistant) && self.caption?.kind == .tool
+            ? lastNonToolCaption : self.caption
         let latest: Caption?
         if showAnswers, let answer {
             latest = caption.map { $0.date > answer.date ? $0 : answer } ?? answer

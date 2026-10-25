@@ -21,7 +21,8 @@
     "OpenCodeNavigation",
     "DeepSeekCutout",
     "CutoutCharacters",
-    "DSHBridge"
+    "DSHBridge",
+    "ZCodeBridge"
   ],
   "resource_files": [
     "LipVowels.json",

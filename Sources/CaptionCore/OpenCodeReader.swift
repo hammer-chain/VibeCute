@@ -1,7 +1,7 @@
 import Foundation
 import CSQLite
 
-/// A passive reader of OpenCode's local session/message/part projections.
+/// A passive reader of the local OpenCode or zcode session/message/part projections.
 /// One connection, confined to the caller's reader queue; never opens a writer or server.
 public final class OpenCodeReader {
     public static let sessionLimit = 32
@@ -18,6 +18,7 @@ public final class OpenCodeReader {
     }
     public private(set) var metrics = Metrics()
     public let url: URL
+    private let source: SessionSource
     private var db: OpaquePointer?
     private var statements: [String: OpaquePointer] = [:]
     private var inode: UInt64?
@@ -31,7 +32,7 @@ public final class OpenCodeReader {
     private var hasV1 = false
     private var hasV2 = false
 
-    public init(url: URL) { self.url = url }
+    public init(url: URL, source: SessionSource = .opencode) { self.url = url; self.source = source }
     deinit { close() }
 
     private func close() {
@@ -46,7 +47,7 @@ public final class OpenCodeReader {
     private func failure() -> NSError {
         // Do not expose SQL, source text or credentials in the settings panel.
         NSError(domain: "OpenCodeReader", code: Int(db.map(sqlite3_errcode) ?? SQLITE_CANTOPEN),
-                userInfo: [NSLocalizedDescriptionKey: "无法读取 OpenCode 数据库，请检查目录、权限或数据库格式。"])
+                userInfo: [NSLocalizedDescriptionKey: "无法读取 \(source.rawValue) 数据库，请检查目录、权限或数据库格式。"])
     }
 
     private func query(_ sql: String, _ arguments: [String] = []) throws -> [[String]] {
@@ -104,11 +105,17 @@ public final class OpenCodeReader {
 
     // Normalize both stores without copying history or exposing tool output.
     private var metadata: String {
+        if source == .zcode {
+            return "SELECT s.id,s.directory,COALESCE(s.title,''),s.project_id,'',s.time_updated,1 AS generation,s.parent_id,s.time_archived FROM session s"
+        }
         let columns = "s.id,s.directory,COALESCE(s.title,''),s.project_id,COALESCE(p.name,''),s.time_updated"
         var stores: [String] = []
         if hasV2 { stores.append("SELECT \(columns),2 AS generation,s.parent_id,s.time_archived FROM session_v2 s LEFT JOIN project p ON p.id=s.project_id") }
         if hasV1 { stores.append("SELECT \(columns),1 AS generation,s.parent_id,s.time_archived FROM session s LEFT JOIN project p ON p.id=s.project_id" + (hasV2 ? " WHERE NOT EXISTS (SELECT 1 FROM session_v2 v WHERE v.id=s.id)" : "")) }
         return "SELECT * FROM (" + stores.joined(separator: " UNION ALL ") + ") s"
+    }
+    private var visibleSessionFilter: String {
+        "s.parent_id IS NULL AND s.time_archived IS NULL" + (source == .zcode ? " AND s.time_deleted IS NULL" : "")
     }
 
     private static let messagesV2 = """
@@ -158,7 +165,7 @@ public final class OpenCodeReader {
         if schemaVersion != currentSchema {
             let tables = Set(try query("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('session','message','part','session_v2','session_message')").compactMap { $0.first })
             hasV1 = ["session", "message", "part"].allSatisfy { tables.contains($0) }
-            hasV2 = ["session_v2", "session_message"].allSatisfy { tables.contains($0) }
+            hasV2 = source == .opencode && ["session_v2", "session_message"].allSatisfy { tables.contains($0) }
             guard hasV1 || hasV2 else { throw failure() }
             schemaVersion = currentSchema; dataVersion = nil; lastDiscovery = .distantPast
         }
@@ -168,7 +175,7 @@ public final class OpenCodeReader {
         defer { _ = try? query("ROLLBACK") }
         var baseIDs = discoveredIDs
         if snapshots.isEmpty || now.timeIntervalSince(lastDiscovery) >= 8 {
-            baseIDs = try query(metadata + " WHERE s.parent_id IS NULL AND s.time_archived IS NULL ORDER BY s.time_updated DESC,s.id DESC LIMIT 32")
+            baseIDs = try query(metadata + " WHERE " + visibleSessionFilter + " ORDER BY s.time_updated DESC,s.id DESC LIMIT 32")
                 .map { $0[0] }
             metrics.discovered = true
         }
@@ -185,12 +192,12 @@ public final class OpenCodeReader {
         var next: [String: SessionSnapshot] = [:]
         var retainedParts = Set<String>()
         for id in ids {
-            guard let row = try query(metadata + " WHERE s.id=? AND s.parent_id IS NULL AND s.time_archived IS NULL", [id]).first else { continue }
+            guard let row = try query(metadata + " WHERE s.id=? AND " + visibleSessionFilter, [id]).first else { continue }
             var snapshot = SessionSnapshot(path: url.path + "#" + id, id: id, project: row[1], title: row[2],
                                            activity: Self.date(row[5]))
-            snapshot.source = .opencode
+            snapshot.source = source
             // Use authoritative project identity; 'global' is projectless.
-            if row[3] != "global" { snapshot.projectID = row[3]; snapshot.projectName = row[4] }
+            if source == .opencode && row[3] != "global" { snapshot.projectID = row[3]; snapshot.projectName = row[4] }
             let v2 = row[6] == "2"
             let recent = try query(v2 ? Self.messagesV2 : Self.messages, [id]).reversed()
             // Keep the last measured response during streaming or a long tool
@@ -207,7 +214,13 @@ public final class OpenCodeReader {
             }
             let latestUser = recent.last(where: { $0[3] == "user" })
             let v2User = v2 ? try query("SELECT id,time_created,seq FROM session_message WHERE session_id=? AND type='user' ORDER BY seq DESC LIMIT 1", [id]).first : nil
-            let turnID = v2User?[0] ?? latestUser?[0] ?? recent.last(where: { $0[3] == "assistant" })?[4] ?? ""
+            // zcode can admit a steering user message while the running assistant
+            // keeps its original parentID. Use the newest published message to
+            // identify the live turn, rather than the newest user row alone.
+            let latestAssistant = recent.last(where: { $0[3] == "assistant" })
+            let zcodeTurnID = source == .zcode && (latestAssistant?[1] ?? "") > (latestUser?[1] ?? "")
+                ? latestAssistant?[4] : nil
+            let turnID = v2User?[0] ?? zcodeTurnID ?? latestUser?[0] ?? latestAssistant?[4] ?? ""
             let assistants = recent.filter { $0[3] == "assistant" && (v2 ? (Int64($0[4]) ?? 0) > (Int64(v2User?[2] ?? "-1") ?? -1) : (turnID.isEmpty || $0[4] == turnID)) }
             if let start = v2User ?? latestUser ?? assistants.first { snapshot.apply(.started(Self.date(start[1]), turnID: turnID)) }
             for message in assistants {

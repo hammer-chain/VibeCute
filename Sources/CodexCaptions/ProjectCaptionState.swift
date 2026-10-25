@@ -67,7 +67,12 @@ final class ProjectCaptionState {
         // A current-turn thought remains useful while a long-running hidden tool
         // is active, including after restarting or toggling the tool preference.
         let retainingThought = active && !tools && value.caption?.kind == .tool
-        guard retainingThought || caption.kind == .subagent || Date().timeIntervalSince(caption.date) < 90 else { return }
+        // A zcode response can spend minutes inside a tool without writing a
+        // new visible part. Reconstruct its current subtitle after a restart or
+        // a question card closes while the session is still live.
+        let liveZCodeCaption = value.source == .zcode && active
+        guard retainingThought || liveZCodeCaption || caption.kind == .subagent
+            || Date().timeIntervalSince(caption.date) < 90 else { return }
         let continuing = !awaitingNewMessage && kind == caption.kind.rawValue
             && !lastCaptionText.isEmpty && caption.text.hasPrefix(lastCaptionText)
         if !continuing { typingGeneration = UUID().uuidString }

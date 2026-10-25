@@ -48,7 +48,7 @@ final class QuestionReplyView: NSView {
     private var contentWidth: CGFloat = 0
     private var repliesInCodex: Bool {
         guard let request, !request.approval, request.questions.indices.contains(page) else { return false }
-        return request.questions[page].options.isEmpty || (request.questions[page].multiSelect && !request.externalQuestion)
+        return request.questions[page].options.isEmpty || (request.questions[page].multiSelect && !request.externalQuestion && !request.externalZCode)
     }
 
     init() {
@@ -247,7 +247,9 @@ final class QuestionReplyView: NSView {
         previous.isEnabled = page > 0 && !submitting && !uncertain
         next.isEnabled = page + 1 < count && !submitting && !uncertain
         submit.isHidden = approval || repliesInCodex; deny.isHidden = !approval
-        ownReply.title = request?.applicationName == "DSH" ? "去 DSH 处理" : repliesInCodex ? "去Codex里回复" : "我要自己回复"
+        ownReply.title = request?.applicationName == "DSH" ? "去 DSH 处理"
+            : request?.externalZCode == true ? "去 zcode 处理"
+            : repliesInCodex ? "去Codex里回复" : "我要自己回复"
         let options = request?.questions.first?.options ?? []
         let primary = options.first == "允许本次" || options.first == "允许本轮"
         allow.isHidden = !approval || !primary; scope.isHidden = !approval || options.count <= 2

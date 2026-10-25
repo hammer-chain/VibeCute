@@ -4,7 +4,7 @@ import AVFoundation
 import CaptionCore
 
 enum AudioCharacterTarget: String, CaseIterable, Identifiable {
-    case both, codex, deepseek, claude, doubao, opencode, workbuddy, companion
+    case both, codex, deepseek, claude, doubao, opencode, zcode, workbuddy, companion
     var id: String { rawValue }
     var title: String {
         switch self {
@@ -14,6 +14,7 @@ enum AudioCharacterTarget: String, CaseIterable, Identifiable {
         case .claude: return "Claude Code 的角色"
         case .doubao: return "豆包工作的角色"
         case .opencode: return "OpenCode 的角色"
+        case .zcode: return "zcode 的角色"
         case .workbuddy: return "WorkBuddy 的角色"
         case .companion: return "不绑定 Harness 的角色"
         }

@@ -87,6 +87,7 @@ enum OpenCodeChecks {
     }
 
     static func run() throws {
+        try zcodeSchema()
         try versionTwo()
         try responseSpeed()
         let f = try Fixture()
@@ -185,6 +186,48 @@ enum OpenCodeChecks {
         let archived = try bounded.poll()
         precondition(!archived.contains { $0.id == "s39" })
         print("PASS: OpenCode WAL streaming, allowlist/redaction, completion/tool continuation/errors, children, titles, idle, discovery, retry and replacement")
+    }
+
+    private static func zcodeSchema() throws {
+        let f = try Fixture()
+        f.exec("DROP TABLE project")
+        f.session("zcode-main"); f.session("zcode-child", parent: "zcode-main")
+        f.exec("ALTER TABLE session ADD COLUMN time_deleted INTEGER")
+        f.message("u", ["role": "user"], session: "zcode-main", at: 1000)
+        f.message("a", ["role": "assistant", "parentID": "u"], session: "zcode-main", at: 1100)
+        f.part("p001", ["type": "reasoning", "text": "正在分析"], message: "a", session: "zcode-main")
+        f.part("p002", ["type": "text", "text": "先检查文件"], message: "a", session: "zcode-main", at: 1101)
+        f.part("p003", ["type": "tool", "tool": "Bash", "state": ["status": "running",
+            "input": ["command": "swift build"]]], message: "a", session: "zcode-main", at: 1102)
+        f.part("private", ["type": "text", "text": "USER_PRIVATE"], message: "u", session: "zcode-main")
+        let reader = OpenCodeReader(url: f.url, source: .zcode)
+        var values = try reader.poll()
+        precondition(values.count == 1 && values[0].source == .zcode && values[0].active)
+        precondition(values[0].caption?.kind == .tool && values[0].projectID.isEmpty)
+        precondition(values[0].displayCaption(showAnswers: true, showTools: true)?.text == "先检查文件")
+        precondition(!values[0].displayCaption(showAnswers: true, showTools: true)!.text.contains("USER_PRIVATE"))
+        f.message("steer", ["role": "user"], session: "zcode-main", at: 1150)
+        f.message("b", ["role": "assistant", "parentID": "u", "finish": "stop",
+                        "time": ["created": 1200, "completed": 1250]], session: "zcode-main", at: 1200)
+        f.part("answer", ["type": "text", "text": "已完成"], message: "b", session: "zcode-main", at: 1250)
+        values = try reader.poll()
+        precondition(values.count == 1 && !values[0].active && values[0].answer?.text == "已完成")
+        if let path = ProcessInfo.processInfo.environment["ZCODE_CHECK_DATABASE"] {
+            let real = OpenCodeReader(url: URL(fileURLWithPath: path), source: .zcode)
+            for label in ["cold", "idle"] {
+                let start = ProcessInfo.processInfo.systemUptime
+                let values = try real.poll()
+                precondition(values.allSatisfy { $0.source == .zcode && !$0.id.isEmpty })
+                let withAssistantAndTool = values.filter { $0.caption?.kind == .tool && $0.lastNonToolCaption != nil }
+                precondition(withAssistantAndTool.allSatisfy {
+                    $0.displayCaption(showAnswers: true, showTools: true)?.kind != .tool
+                })
+                print(String(format: "zcode real %@: %.3f ms, sessions=%d assistantBeforeTool=%d queries=%d rows=%d decodedParts=%d", label,
+                    (ProcessInfo.processInfo.systemUptime - start) * 1000, values.count, withAssistantAndTool.count,
+                    real.metrics.queries, real.metrics.rows, real.metrics.decodedParts))
+            }
+        }
+        print("PASS: zcode legacy SQLite schema, child exclusion, steering, visible captions, completion and private input isolation")
     }
 
     static func responseSpeed() throws {

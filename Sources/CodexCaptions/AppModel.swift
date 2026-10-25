@@ -354,6 +354,7 @@ final class AppModel: ObservableObject {
     @Published var harnessPath = ""
     @Published var claudePath = ""
     @Published var openCodePath = ""
+    @Published var zcodePath = ""
     @Published var openCodeNavigationStatus = "等待检测 OpenCode"
     @Published var openCodeInstalled = false
     @Published var openCodePluginInstalling = false
@@ -601,6 +602,8 @@ final class AppModel: ObservableObject {
     private var monitor: SessionMonitor?
     private var doubaoReader: DoubaoVisibleReader?
     private let harnessApprovalReplies = HarnessApprovalReply()
+    private let zcodeHookBridge = ZCodeHookBridge()
+    @Published var zcodeHookStatus = ""
     let dshBridge = DSHBridgeManager()
     private lazy var questionReplies = CodexQuestionReply(socketPath: argument("--codex-question-socket")
         ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".codex/ipc/ipc.sock").path)
@@ -718,9 +721,15 @@ final class AppModel: ObservableObject {
             defaults.set(storedHarnesses.sorted(), forKey: "trackedHarnesses")
             defaults.set(true, forKey: "doubaoTrackingMigrated")
         }
+        if !defaults.bool(forKey: "zcodeTrackingMigrated") {
+            storedHarnesses.insert("zcode")
+            defaults.set(storedHarnesses.sorted(), forKey: "trackedHarnesses")
+            defaults.set(true, forKey: "zcodeTrackingMigrated")
+        }
         // Isolated QA can exclude the real foreground conversation.
         if CommandLine.arguments.contains("--no-doubao") { storedHarnesses.remove("doubao") }
         if CommandLine.arguments.contains("--no-workbuddy") { storedHarnesses.remove("workbuddy") }
+        if CommandLine.arguments.contains("--no-zcode") { storedHarnesses.remove("zcode") }
         trackedHarnesses = storedHarnesses
         characterBindings = (bearArgument == nil ? defaults.dictionary(forKey: "characterBindings") as? [String: String] : nil)
             ?? Dictionary(uniqueKeysWithValues: SessionSource.allCases.map { source in
@@ -931,6 +940,7 @@ final class AppModel: ObservableObject {
             object: nil, queue: nil) { [weak self] _ in
                 self?.audio.speech.setEnabled(false); self?.audio.shutdown(); self?.nowPlaying.stop()
                 self?.rainShelter.stopAll(); self?.rainWeather.configure(city: nil); self?.desktopRain.stop(); self?.rainCitySearch?.cancel()
+                self?.zcodeHookBridge.stop()
             }
         configureAudio()
         if !CommandLine.arguments.contains("--no-position-memory") {
@@ -952,6 +962,9 @@ final class AppModel: ObservableObject {
         let dataHome = ProcessInfo.processInfo.environment["XDG_DATA_HOME"] ?? NSHomeDirectory() + "/.local/share"
         openCodePath = argument("--opencode-root") ?? preferences.string(forKey: "openCodeRoot")
             ?? dataHome + "/opencode"
+        zcodePath = argument("--zcode-root") ?? preferences.string(forKey: "zcodeRoot")
+            ?? NSHomeDirectory() + "/.zcode"
+        zcodeHookStatus = ZCodeHookSetup.isInstalled() ? "已接入新会话" : ""
         workBuddyPath = argument("--workbuddy-root") ?? preferences.string(forKey: "workBuddyRoot")
             ?? NSHomeDirectory() + "/.workbuddy"
         connect(root: URL(fileURLWithPath: root))
@@ -1009,6 +1022,20 @@ final class AppModel: ObservableObject {
         monitor = nil
         doubaoReader = nil
         sourcePath = root.path
+        if tracks(.zcode) {
+            zcodeHookBridge.onChange = { [weak self] in
+                guard let self else { return }
+                let visible = Set(self.sessions.filter { session in
+                    session.source == .zcode && (self.selection.isEmpty ||
+                        self.selected.map(captionGroup) == captionGroup(session))
+                }.map(\.id))
+                for item in self.zcodeHookBridge.items where !visible.contains(item.sessionID) {
+                    self.zcodeHookBridge.handoff(item.request.id)
+                }
+                self.pruneQuestionNotifications(); self.redraw()
+            }
+            zcodeHookBridge.start()
+        } else { zcodeHookBridge.stop() }
         guard !trackedHarnesses.isEmpty else { updateApprovalTracking(); receive([], error: nil); return }
         openCodeNavigationInstaller.onStatus = { [weak self] value in
             self?.openCodeNavigationStatus = value
@@ -1031,6 +1058,7 @@ final class AppModel: ObservableObject {
         let reader = SessionMonitor(root: root, harnessRoot: harnessPath.isEmpty ? nil : URL(fileURLWithPath: harnessPath),
                                     claudeRoot: claudePath.isEmpty ? nil : URL(fileURLWithPath: claudePath),
                                     openCodeRoot: openCodePath.isEmpty ? nil : URL(fileURLWithPath: openCodePath),
+                                    zcodeRoot: zcodePath.isEmpty ? nil : URL(fileURLWithPath: zcodePath),
                                     workBuddyRoot: workBuddyPath.isEmpty ? nil : URL(fileURLWithPath: workBuddyPath),
                                     enabledSources: Set(SessionSource.allCases.filter { tracks($0) }),
                                     visibleReader: visible.map { adapter in { adapter.poll() } })
@@ -1077,7 +1105,7 @@ final class AppModel: ObservableObject {
     }
 
     func directoryPath(for source: SessionSource) -> String {
-        switch source { case .codex: return sourcePath; case .deepseek: return harnessPath; case .opencode: return openCodePath; case .workbuddy: return workBuddyPath; case .claude: return claudePath; case .doubao: return "跟随当前打开的对话 · 需要辅助功能权限" }
+        switch source { case .codex: return sourcePath; case .deepseek: return harnessPath; case .opencode: return openCodePath; case .zcode: return zcodePath; case .workbuddy: return workBuddyPath; case .claude: return claudePath; case .doubao: return "跟随当前打开的对话 · 需要辅助功能权限" }
     }
 
     func openDoubaoAccessibilitySettings() {
@@ -1115,6 +1143,26 @@ final class AppModel: ObservableObject {
             openCodePath = url.path; save("openCodeRoot", url.path)
             selection = ""; states.removeAll(); connect(root: URL(fileURLWithPath: sourcePath))
         }
+    }
+
+    func chooseZcodeDirectory() {
+        let panel = NSOpenPanel()
+        panel.title = "选择 zcode 数据目录"
+        panel.message = "选择包含 cli/db/db.sqlite 的目录，默认 ~/.zcode。"
+        panel.canChooseDirectories = true; panel.canChooseFiles = false; panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true; panel.directoryURL = URL(fileURLWithPath: zcodePath)
+        NSApp.activate(ignoringOtherApps: true)
+        if panel.runModal() == .OK, let url = panel.url {
+            zcodePath = url.path; save("zcodeRoot", url.path)
+            selection = ""; states.removeAll(); connect(root: URL(fileURLWithPath: sourcePath))
+        }
+    }
+
+    func installZcodeHook() {
+        do {
+            _ = try ZCodeHookSetup.install()
+            zcodeHookStatus = "已接入新会话"
+        } catch { zcodeHookStatus = error.localizedDescription }
     }
 
     func pinCurrent() { if let selected { selection = selected.path } }
@@ -2062,7 +2110,7 @@ final class AppModel: ObservableObject {
     private func pruneQuestionNotifications() {
         notifiedQuestions.formIntersection(Set(sessions.flatMap { session in
             session.pendingQuestions.map { session.id + ":" + $0.id }
-        } + pendingApprovals.map(\.key)))
+        } + pendingApprovals.map(\.key) + zcodeHookBridge.items.map { $0.sessionID + ":" + $0.request.id }))
     }
 
     private func updateApprovalTracking() {
@@ -2090,11 +2138,12 @@ final class AppModel: ObservableObject {
             return { ClaudeConversationNavigator.shared.open(sessionID: session.id) }
         case .opencode:
             return { OpenCodeConversationNavigator.open(sessionID: session.id) }
+        case .zcode:
+            return { ZCodeConversationNavigator.open() }
         case .workbuddy:
             return { WorkBuddyConversationNavigator.open(sessionID: session.id) }
         case .doubao:
             return { DoubaoConversationNavigator.open(sessionID: session.id) }
-        default: return nil
         }
     }
 
@@ -2155,6 +2204,13 @@ final class AppModel: ObservableObject {
                       selection.isEmpty || captionGroup(session) == focusedID else { return nil }
                 return (session, approval.question, approval)
             }
+            pending += zcodeHookBridge.items.compactMap { item in
+                guard !submittedQuestions.contains(item.sessionID + ":" + item.request.id),
+                      !closedQuestions.contains(item.sessionID + ":" + item.request.id),
+                      let session = sessions.first(where: { $0.source == .zcode && $0.id == item.sessionID }),
+                      selection.isEmpty || captionGroup(session) == focusedID else { return nil }
+                return (session, item.request, nil)
+            }
             // One expanded question at a time prevents overlapping cards and
             // preserves an in-progress draft when another chat asks a question.
             let chosen = pending.first { $0.0.id + ":" + $0.1.id == displayedQuestion }
@@ -2179,7 +2235,7 @@ final class AppModel: ObservableObject {
                     typewriterID: typewriterEnabled ? state.typewriterID : nil,
                     typewriterCharactersPerSecond: typewriterCharactersPerSecond,
                     averageSpeed: state.session.source == .codex ? codexAverageSpeeds[state.session.id]
-                        : state.session.source == .opencode ? state.session.openCodeResponseSpeed?.tokensPerSecond
+                        : state.session.source == .opencode || state.session.source == .zcode ? state.session.openCodeResponseSpeed?.tokensPerSecond
                         : state.session.harnessResponseSpeed?.tokensPerSecond,
                     quotaText: state.session.source == .codex ? codexQuota?.displayText()
                         : state.session.source == .deepseek ? displayedHarnessBalance : nil,
@@ -2205,9 +2261,14 @@ final class AppModel: ObservableObject {
                     header: request.applicationName + " · " + (request.approval ? "等待审批 · " : "等待回复 · ") + session.headerName, title: session.headerName,
                     active: false, mascot: CaptionMascot(rawValue: session.source.preferenceID), question: request,
                     averageSpeed: codexAverageSpeeds[session.id], quotaText: codexQuota?.displayText(),
-                    onOpenConversation: Self.conversationOpener(session: session),
+                    onOpenConversation: request.externalZCode ? { [weak self] in
+                        let error = Self.conversationOpener(session: session)?()
+                        if error == nil { self?.zcodeHookBridge.handoff(request.id) }
+                        return error
+                    } : Self.conversationOpener(session: session),
                     onQuestionClose: { [weak self] in
                         guard let self else { return }
+                        if request.externalZCode { self.zcodeHookBridge.handoff(request.id) }
                         self.closedQuestions.insert(key)
                         var recent = self.preferences.stringArray(forKey: "closedRequestBubbles") ?? []
                         recent.removeAll { $0 == key }; recent.append(key)
@@ -2227,7 +2288,9 @@ final class AppModel: ObservableObject {
                                 self.redraw()
                             }
                         }
-                        if request.externalQuestion {
+                        if request.externalZCode {
+                            self.zcodeHookBridge.submit(sessionID: session.id, request: request, answers: answers, completion: done)
+                        } else if request.externalQuestion {
                             self.harnessApprovalReplies.submitQuestion(sessionID:session.id, request:request, answers:answers, completion:done)
                         } else if request.externalApproval {
                             self.harnessApprovalReplies.submit(sessionID: session.id, request: request,
@@ -2254,6 +2317,7 @@ final class AppModel: ObservableObject {
         let metricsSession = selected?.source == .deepseek ? selected : sessions.first { $0.source == .deepseek }
         let codexMetricsSession = selected?.source == .codex ? selected : sessions.first { $0.source == .codex }
         let openCodeMetricsSession = selected?.source == .opencode ? selected : sessions.first { $0.source == .opencode }
+        let zcodeMetricsSession = selected?.source == .zcode ? selected : sessions.first { $0.source == .zcode }
         var restingMascots = Set<CaptionMascot>()
         if enabled && demoMode && hidePreviewCaption { restingMascots.insert(demoMascot) }
         if enabled && (!demoMode || isolatedActionPreview) {
@@ -2295,6 +2359,8 @@ final class AppModel: ObservableObject {
                             .codex: OverlayHoverMetrics(averageSpeed: codexMetricsSession.flatMap { codexAverageSpeeds[$0.id] },
                                 quotaText: codexQuota?.displayText()),
                             .opencode: OverlayHoverMetrics(averageSpeed: openCodeMetricsSession?.openCodeResponseSpeed?.tokensPerSecond,
+                                quotaText: nil),
+                            .zcode: OverlayHoverMetrics(averageSpeed: zcodeMetricsSession?.openCodeResponseSpeed?.tokensPerSecond,
                                 quotaText: nil)],
                         hungrySoundEnabled: taskSoundsEnabled, hungrySoundVolume: taskSoundVolume / 3,
                         cutoutHair: Dictionary(uniqueKeysWithValues: effectiveCharacterBindings.filter {
